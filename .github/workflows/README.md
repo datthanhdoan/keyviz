@@ -264,4 +264,19 @@ Các workflow đã được cập nhật để sử dụng `softprops/action-gh-
 - Tự động xác định release dựa trên tag thay vì cần cung cấp URL tải lên cụ thể
 - Hỗ trợ tải lên nhiều tệp cùng một lúc
 
-Thay đổi này giúp quy trình tải lên tệp vào release đáng tin cậy hơn và ít gặp lỗi hơn. 
+Thay đổi này giúp quy trình tải lên tệp vào release đáng tin cậy hơn và ít gặp lỗi hơn.
+
+### Cập nhật xử lý tag cho GitHub Releases
+
+Các workflow đã được cập nhật để đảm bảo luôn có tag khi sử dụng `softprops/action-gh-release`:
+
+- Action `softprops/action-gh-release` yêu cầu bắt buộc phải có tag để xác định release
+- Workflow sẽ tự động xác định tag dựa trên loại sự kiện:
+  - Nếu là sự kiện release, sử dụng tag của release
+  - Nếu là push vào nhánh develop, sử dụng tag `latest-dev`
+  - Nếu không có tag nào được xác định, tự động tạo tag mới với định dạng `auto-release-TIMESTAMP`
+- Thêm tên và mô tả cho release để dễ nhận biết
+- Tự động tạo tag mới nếu tag chưa tồn tại trong repository
+- Sử dụng cú pháp PowerShell cho Windows và Bash cho Linux/macOS để đảm bảo tương thích
+
+Cập nhật này giúp khắc phục lỗi "⚠️ GitHub Releases requires a tag" khi sử dụng `softprops/action-gh-release`. 
