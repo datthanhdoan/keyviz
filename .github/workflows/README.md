@@ -46,12 +46,33 @@ Workflow này tự động kiểm tra code và chạy các bài kiểm tra (test
 2. **test**
    - Chạy các bài kiểm tra tự động
 
-### 3. Publish to Winget (`winget.yml`)
+### 3. Build Windows MSIX Package (`msix.yml`)
 
-Workflow này tự động đăng ký phiên bản mới của KeyViz lên Windows Package Manager (Winget).
+Workflow này tự động tạo gói cài đặt MSIX cho Windows.
 
 **Kích hoạt:**
-- Khi một release được phát hành
+- Khi tạo release mới
+- Thủ công thông qua workflow_dispatch
+
+**Jobs:**
+
+1. **build-msix**
+   - Tạo gói cài đặt MSIX cho Windows
+   - Nếu được kích hoạt bởi release, đính kèm gói MSIX vào release
+
+### 4. Build and Push Docker Image (`docker.yml`)
+
+Workflow này tự động tạo và đẩy Docker image lên GitHub Container Registry.
+
+**Kích hoạt:**
+- Khi tạo release mới
+- Thủ công thông qua workflow_dispatch
+
+**Jobs:**
+
+1. **build-and-push**
+   - Tạo Docker image từ Dockerfile
+   - Đẩy image lên GitHub Container Registry với các tag phiên bản
 
 ## Cách sử dụng
 
@@ -60,7 +81,6 @@ Workflow này tự động đăng ký phiên bản mới của KeyViz lên Windo
 1. Tạo tag mới với phiên bản (ví dụ: `v2.0.0`)
 2. Tạo release mới từ tag đó
 3. GitHub Actions sẽ tự động build ứng dụng cho tất cả các nền tảng và đính kèm các file build vào release
-4. Sau khi release được phát hành, Winget workflow sẽ tự động đăng ký phiên bản mới lên Windows Package Manager
 
 ### Kiểm tra Build
 
@@ -80,7 +100,28 @@ Bạn có thể kích hoạt workflow test thủ công để kiểm tra chất l
 3. Nhấp vào "Run workflow"
 4. Chọn nhánh và nhấp vào "Run workflow"
 
+### Tạo Gói MSIX
+
+Bạn có thể kích hoạt workflow MSIX thủ công để tạo gói cài đặt MSIX cho Windows:
+
+1. Đi đến tab "Actions" trên GitHub repository
+2. Chọn workflow "Build Windows MSIX Package"
+3. Nhấp vào "Run workflow"
+4. Chọn nhánh và nhấp vào "Run workflow"
+
+### Sử dụng Docker Image
+
+Sau khi workflow Docker chạy thành công, bạn có thể kéo và chạy Docker image từ GitHub Container Registry:
+
+```bash
+# Kéo image phiên bản mới nhất
+docker pull ghcr.io/datthanhdoan/keyviz:latest
+
+# Chạy container
+docker run -d --name keyviz ghcr.io/datthanhdoan/keyviz:latest
+```
+
 ## Yêu cầu
 
-- Đảm bảo rằng repository có secret `GITHUB_TOKEN` với quyền truy cập đủ để tải lên các tệp vào release
-- Đối với Winget workflow, cần có secret `WINGET_TOKEN` với quyền truy cập đủ để đăng ký gói lên Windows Package Manager 
+- Đảm bảo rằng repository có secret `GITHUB_TOKEN` với quyền truy cập đủ để tải lên các tệp vào release và đẩy Docker image
+- `GITHUB_TOKEN` được GitHub tự động cung cấp, bạn không cần tạo hoặc thêm nó thủ công 

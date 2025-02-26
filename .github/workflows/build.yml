@@ -9,6 +9,10 @@ on:
   release:
     types: [ created ]
 
+# Cấp quyền cho GITHUB_TOKEN
+permissions:
+  contents: write  # Cần thiết để tải lên tệp vào releases
+
 jobs:
   build-windows:
     runs-on: windows-latest

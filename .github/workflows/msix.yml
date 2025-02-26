@@ -1,0 +1,40 @@
+name: Build Windows MSIX Package
+
+on:
+  release:
+    types: [ created ]
+  workflow_dispatch:
+
+# Cấp quyền cho GITHUB_TOKEN
+permissions:
+  contents: write  # Cần thiết để tải lên tệp vào releases
+
+jobs:
+  build-msix:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+          cache: true
+      
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Build MSIX Package
+        run: flutter pub run msix:create
+      
+      - name: Upload MSIX Package
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./build/windows/x64/runner/Release/keyviz.msix
+          asset_name: keyviz-windows.msix
+          asset_content_type: application/octet-stream 
