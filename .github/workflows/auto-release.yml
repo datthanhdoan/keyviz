@@ -1,0 +1,96 @@
+name: Auto Create Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.github/workflows/**'
+      - '.gitignore'
+  workflow_dispatch:
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Get latest tag
+        id: get_latest_tag
+        run: |
+          # Lấy tag mới nhất
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          
+          # Lấy phiên bản từ tag
+          VERSION=${LATEST_TAG#v}
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          PATCH=$(echo $VERSION | cut -d. -f3)
+          
+          # Tăng số patch version
+          PATCH=$((PATCH + 1))
+          
+          # Tạo tag mới
+          NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+          echo "NEW_VERSION=$MAJOR.$MINOR.$PATCH" >> $GITHUB_ENV
+      
+      - name: Check for changes
+        id: check_changes
+        run: |
+          # Kiểm tra xem có thay đổi nào kể từ tag cuối cùng không
+          if [ "$LATEST_TAG" != "v0.0.0" ]; then
+            CHANGES=$(git log $LATEST_TAG..HEAD --oneline)
+            if [ -z "$CHANGES" ]; then
+              echo "No changes since last tag, skipping release"
+              echo "SKIP_RELEASE=true" >> $GITHUB_ENV
+            else
+              echo "SKIP_RELEASE=false" >> $GITHUB_ENV
+              echo "CHANGES<<EOF" >> $GITHUB_ENV
+              echo "$CHANGES" >> $GITHUB_ENV
+              echo "EOF" >> $GITHUB_ENV
+            fi
+          else
+            echo "SKIP_RELEASE=false" >> $GITHUB_ENV
+            echo "CHANGES=Initial release" >> $GITHUB_ENV
+          fi
+      
+      - name: Create Release
+        if: env.SKIP_RELEASE == 'false'
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.NEW_TAG }}
+          release_name: Release ${{ env.NEW_TAG }}
+          body: |
+            Automatic release created by GitHub Actions.
+            
+            Changes in this release:
+            ```
+            ${{ env.CHANGES }}
+            ```
+          draft: false
+          prerelease: false
+      
+      - name: Update version in pubspec.yaml
+        if: env.SKIP_RELEASE == 'false'
+        run: |
+          # Cập nhật phiên bản trong pubspec.yaml
+          sed -i "s/^version: .*/version: ${{ env.NEW_VERSION }}/" pubspec.yaml
+      
+      - name: Commit version update
+        if: env.SKIP_RELEASE == 'false'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add pubspec.yaml
+          git commit -m "Bump version to ${{ env.NEW_TAG }}"
+          git push 

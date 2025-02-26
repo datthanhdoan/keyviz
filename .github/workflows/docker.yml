@@ -2,7 +2,7 @@ name: Build and Push Docker Image
 
 on:
   release:
-    types: [ created ]
+    types: [ created, published ]
   workflow_dispatch:
 
 # Cấp quyền cho GITHUB_TOKEN

@@ -2,33 +2,54 @@
 
 Repository này chứa các GitHub Actions workflow để tự động hóa quy trình phát triển và phát hành KeyViz.
 
+## Quy trình tự động hóa
+
+Quy trình tự động hóa hoạt động như sau:
+
+1. Khi bạn push code vào nhánh `main`, workflow `auto-release.yml` sẽ tự động tạo release mới
+2. Sau khi release được tạo, các workflow khác (`build.yml`, `msix.yml`, `docker.yml`) sẽ tự động chạy để build ứng dụng và đính kèm các file build vào release
+
 ## Workflows
 
-### 1. Build KeyViz (`build.yml`)
+### 1. Auto Create Release (`auto-release.yml`)
+
+Workflow này tự động tạo release mới khi có push vào nhánh `main`.
+
+**Kích hoạt:**
+- Push vào nhánh `main` (ngoại trừ các file .md, .github/workflows, .gitignore)
+- Thủ công thông qua workflow_dispatch
+
+**Jobs:**
+
+1. **create-release**
+   - Lấy tag mới nhất và tăng số phiên bản
+   - Kiểm tra xem có thay đổi nào kể từ tag cuối cùng không
+   - Tạo release mới với danh sách các thay đổi
+   - Cập nhật phiên bản trong pubspec.yaml
+
+### 2. Build KeyViz (`build.yml`)
 
 Workflow này tự động build ứng dụng KeyViz cho các nền tảng Windows, macOS và Linux.
 
 **Kích hoạt:**
-- Push vào nhánh `main`
-- Pull request vào nhánh `main`
+- Khi release được tạo hoặc xuất bản
 - Thủ công thông qua workflow_dispatch
-- Khi tạo release mới
 
 **Jobs:**
 
 1. **build-windows**
    - Build ứng dụng cho Windows
-   - Nếu được kích hoạt bởi release, tạo file ZIP và đính kèm vào release
+   - Tạo file ZIP và đính kèm vào release
 
 2. **build-macos**
    - Build ứng dụng cho macOS
-   - Nếu được kích hoạt bởi release, tạo file DMG và đính kèm vào release
+   - Tạo file DMG và đính kèm vào release
 
 3. **build-linux**
    - Build ứng dụng cho Linux
-   - Nếu được kích hoạt bởi release, tạo file TAR.GZ và đính kèm vào release
+   - Tạo file TAR.GZ và đính kèm vào release
 
-### 2. Test KeyViz (`test.yml`)
+### 3. Test KeyViz (`test.yml`)
 
 Workflow này tự động kiểm tra code và chạy các bài kiểm tra (tests).
 
@@ -46,26 +67,26 @@ Workflow này tự động kiểm tra code và chạy các bài kiểm tra (test
 2. **test**
    - Chạy các bài kiểm tra tự động
 
-### 3. Build Windows MSIX Package (`msix.yml`)
+### 4. Build Windows MSIX Package (`msix.yml`)
 
 Workflow này tự động tạo gói cài đặt MSIX cho Windows.
 
 **Kích hoạt:**
-- Khi tạo release mới
+- Khi release được tạo hoặc xuất bản
 - Thủ công thông qua workflow_dispatch
 
 **Jobs:**
 
 1. **build-msix**
    - Tạo gói cài đặt MSIX cho Windows
-   - Nếu được kích hoạt bởi release, đính kèm gói MSIX vào release
+   - Đính kèm gói MSIX vào release
 
-### 4. Build and Push Docker Image (`docker.yml`)
+### 5. Build and Push Docker Image (`docker.yml`)
 
 Workflow này tự động tạo và đẩy Docker image lên GitHub Container Registry.
 
 **Kích hoạt:**
-- Khi tạo release mới
+- Khi release được tạo hoặc xuất bản
 - Thủ công thông qua workflow_dispatch
 
 **Jobs:**
@@ -76,11 +97,15 @@ Workflow này tự động tạo và đẩy Docker image lên GitHub Container R
 
 ## Cách sử dụng
 
-### Tạo Release
+### Tự động tạo Release
 
-1. Tạo tag mới với phiên bản (ví dụ: `v2.0.0`)
-2. Tạo release mới từ tag đó
-3. GitHub Actions sẽ tự động build ứng dụng cho tất cả các nền tảng và đính kèm các file build vào release
+Mỗi khi bạn push code vào nhánh `main`, workflow `auto-release.yml` sẽ tự động:
+1. Tăng số phiên bản (patch version)
+2. Tạo tag mới
+3. Tạo release mới với danh sách các thay đổi
+4. Cập nhật phiên bản trong pubspec.yaml
+
+Sau khi release được tạo, các workflow khác sẽ tự động chạy để build ứng dụng và đính kèm các file build vào release.
 
 ### Kiểm tra Build
 

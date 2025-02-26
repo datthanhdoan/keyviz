@@ -2,7 +2,7 @@ name: Build Windows MSIX Package
 
 on:
   release:
-    types: [ created ]
+    types: [ created, published ]
   workflow_dispatch:
 
 # Cấp quyền cho GITHUB_TOKEN
@@ -29,7 +29,6 @@ jobs:
         run: flutter pub run msix:create
       
       - name: Upload MSIX Package
-        if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,13 +1,9 @@
 name: Build KeyViz
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
   release:
-    types: [ created ]
+    types: [ created, published ]
+  workflow_dispatch:
 
 # Cấp quyền cho GITHUB_TOKEN
 permissions:
@@ -33,12 +29,10 @@ jobs:
         run: flutter build windows --release
       
       - name: Create Windows ZIP
-        if: github.event_name == 'release'
         run: |
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath keyviz-windows.zip
       
       - name: Upload Windows Artifact
-        if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -67,7 +61,6 @@ jobs:
         run: flutter build macos --release
       
       - name: Create macOS DMG
-        if: github.event_name == 'release'
         run: |
           cd build/macos/Build/Products/Release
           mkdir -p dmg
@@ -76,7 +69,6 @@ jobs:
           mv keyviz-macos.dmg ../../../../../
       
       - name: Upload macOS Artifact
-        if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -110,13 +102,11 @@ jobs:
         run: flutter build linux --release
       
       - name: Create Linux TAR
-        if: github.event_name == 'release'
         run: |
           cd build/linux/x64/release/bundle
           tar -czvf ../../../../../keyviz-linux.tar.gz .
       
       - name: Upload Linux Artifact
-        if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
