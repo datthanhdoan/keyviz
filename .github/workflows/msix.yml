@@ -11,6 +11,13 @@ on:
     branches:
       - main
       - develop
+  push:
+    branches:
+      - develop
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - '.github/workflows/auto-release.yml'
 
 # Cấp quyền cho GITHUB_TOKEN
 permissions:
