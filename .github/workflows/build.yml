@@ -85,19 +85,10 @@ jobs:
           Set-Content -Path "build/windows/x64/runner/Release/config.json" -Value $configContent
           
           # 4. Tạo file debug.bat để chạy ứng dụng với log
-          $debugBatContent = '@echo off
-echo Starting KeyViz with debug logging...
-start /b keyviz.exe > debug.log 2>&1
-echo Log file created at debug.log'
-          Set-Content -Path "build/windows/x64/runner/Release/debug.bat" -Value $debugBatContent
+          Set-Content -Path "build/windows/x64/runner/Release/debug.bat" -Value "@echo off`necho Starting KeyViz with debug logging...`nstart /b keyviz.exe > debug.log 2>&1`necho Log file created at debug.log"
           
           # 5. Tạo file README với hướng dẫn debug
-          $readmeDebugContent = 'Nếu ứng dụng không chạy được, vui lòng:
-
-1. Chạy file debug.bat để tạo file log
-2. Kiểm tra file debug.log để xem lỗi
-3. Gửi file debug.log cho nhà phát triển để được hỗ trợ'
-          Set-Content -Path "build/windows/x64/runner/Release/DEBUG.txt" -Value $readmeDebugContent
+          Set-Content -Path "build/windows/x64/runner/Release/DEBUG.txt" -Value "Nếu ứng dụng không chạy được, vui lòng:`n`n1. Chạy file debug.bat để tạo file log`n2. Kiểm tra file debug.log để xem lỗi`n3. Gửi file debug.log cho nhà phát triển để được hỗ trợ"
           
           # 6. Kiểm tra và sửa các plugin
           $pluginsDir = "build/windows/x64/runner/Release/data/flutter_assets/packages"
