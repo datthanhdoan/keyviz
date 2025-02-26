@@ -191,6 +191,28 @@ class KeyEventProvider extends ChangeNotifier with TrayListener {
   // show mouse events with keypress like, [Shift] + [Drag]
   bool _showMouseEvents = _Defaults.showMouseEvents;
 
+  // Thêm biến để lưu trữ lỗi
+  String? _errorMessage;
+  
+  // Getter để kiểm tra xem có lỗi không
+  bool get hasError => _errorMessage != null;
+  
+  // Getter để lấy thông báo lỗi
+  String? get errorMessage => _errorMessage;
+  
+  // Phương thức để đặt thông báo lỗi
+  void setError(String message) {
+    _errorMessage = message;
+    print("KeyEventProvider error set: $message");
+    notifyListeners();
+  }
+  
+  // Phương thức để xóa lỗi
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   Screen get _currentScreen => _screens[_screenIndex];
 
   Map<String, Map<int, KeyEventData>> get keyboardEvents => _keyboardEvents;

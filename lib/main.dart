@@ -26,6 +26,13 @@ void main() async {
     try {
       await windowManager.ensureInitialized();
       print("Window manager initialized successfully");
+      
+      // Thiết lập cửa sổ cơ bản ngay từ đầu
+      await windowManager.setAsFrameless();
+      await windowManager.setHasShadow(false);
+      await windowManager.setAlwaysOnTop(true);
+      await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+      print("Basic window options applied early");
     } catch (e) {
       print("Error initializing window manager: $e");
     }
@@ -44,16 +51,41 @@ void main() async {
     } catch (e) {
       print("Error initializing listener backend: $e");
     }
+    
+    // Áp dụng hiệu ứng trong suốt trước khi chạy ứng dụng
+    try {
+      if (Platform.isMacOS) {
+        try {
+          await MacOSWindowUtils.initialize();
+          WindowManipulator.makeWindowFullyTransparent();
+          print("macOS transparency applied early");
+        } catch (e) {
+          print("Error in early macOS transparency: $e");
+        }
+      } else {
+        try {
+          Window.setEffect(
+            effect: WindowEffect.transparent,
+            color: Colors.transparent,
+          );
+          print("Non-macOS transparency applied early");
+        } catch (e) {
+          print("Error applying early transparency: $e");
+        }
+      }
+    } catch (e) {
+      print("Error applying early transparency effects: $e");
+    }
 
     // Chạy ứng dụng
     runApp(const KeyvizApp());
 
-    // Khởi tạo cửa sổ với xử lý lỗi
+    // Hoàn thiện cấu hình cửa sổ sau khi ứng dụng đã chạy
     try {
-      await _initWindow();
-      print("Window initialization completed");
+      await _finalizeWindow();
+      print("Window finalization completed");
     } catch (e) {
-      print("Error during window initialization: $e");
+      print("Error during window finalization: $e");
     }
   } catch (e, stackTrace) {
     // Xử lý lỗi tổng thể
@@ -74,72 +106,42 @@ void main() async {
   }
 }
 
-Future<void> _initWindow() async {
+Future<void> _finalizeWindow() async {
   try {
-    // Đảm bảo ứng dụng hiển thị trước khi áp dụng hiệu ứng
-    await Future.delayed(Duration(seconds: 1));
-    print("Waiting for window to be ready...");
+    // Đợi ngắn để ứng dụng hiển thị
+    await Future.delayed(Duration(milliseconds: 500));
+    print("Short wait before finalizing window...");
     
-    // Thiết lập cửa sổ cơ bản trước
-    await windowManager.waitUntilReadyToShow(
-      WindowOptions(
-        skipTaskbar: false, // Tạm thời hiển thị trên taskbar
-        alwaysOnTop: true,
-        fullScreen: !Platform.isMacOS,
-        titleBarStyle: TitleBarStyle.hidden,
-      ),
-      () async {
-        try {
-          // Chưa ẩn cửa sổ ngay
-          await windowManager.setHasShadow(false);
-          await windowManager.setAsFrameless();
-          print("Basic window options applied successfully");
-        } catch (e) {
-          print("Error applying basic window options: $e");
+    // Thiết lập cửa sổ cuối cùng
+    await windowManager.waitUntilReadyToShow(null, () async {
+      try {
+        // Hiển thị cửa sổ
+        await windowManager.show();
+        print("Window shown");
+        
+        // Đợi ngắn để đảm bảo cửa sổ đã hiển thị
+        await Future.delayed(Duration(milliseconds: 300));
+        
+        // Áp dụng các thiết lập cuối cùng
+        if (Platform.isMacOS) {
+          try {
+            await WindowManipulator.zoomWindow();
+            print("macOS window zoomed");
+          } catch (e) {
+            print("Error zooming macOS window: $e");
+          }
         }
-      },
-    );
-
-    // Đảm bảo ứng dụng đã hiển thị trước khi áp dụng hiệu ứng trong suốt
-    await Future.delayed(Duration(seconds: 2));
-    print("Applying transparency effects...");
-    
-    try {
-      // Áp dụng hiệu ứng trong suốt
-      if (Platform.isMacOS) {
-        try {
-          WindowManipulator.makeWindowFullyTransparent();
-          await WindowManipulator.zoomWindow();
-          print("macOS specific window setup completed");
-        } catch (e) {
-          print("Error in macOS window setup: $e");
-        }
-      } else {
-        try {
-          Window.setEffect(
-            effect: WindowEffect.transparent,
-            color: Colors.transparent,
-          );
-          print("Non-macOS window effect applied");
-        } catch (e) {
-          print("Error applying window effect: $e");
-        }
+        
+        // Áp dụng các thiết lập cuối cùng
+        await windowManager.setIgnoreMouseEvents(true);
+        await windowManager.setSkipTaskbar(true);
+        print("Final window settings applied");
+      } catch (e) {
+        print("Error in window finalization steps: $e");
       }
-      
-      // Đảm bảo ứng dụng đã hiển thị trước khi ẩn khỏi tương tác
-      await Future.delayed(Duration(seconds: 1));
-      print("Finalizing window setup...");
-      
-      // Áp dụng các thiết lập cuối cùng
-      await windowManager.setIgnoreMouseEvents(true);
-      await windowManager.setSkipTaskbar(true);
-      await windowManager.blur();
-      print("Window blur and ignore mouse events applied");
-    } catch (e) {
-      print("Error applying final window effects: $e");
-    }
+    });
   } catch (e) {
-    print("Error in _initWindow: $e");
+    print("Error in _finalizeWindow: $e");
     rethrow;
   }
 }

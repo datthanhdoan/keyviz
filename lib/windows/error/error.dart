@@ -1,60 +1,80 @@
 import 'package:flutter/material.dart';
-import 'package:keyviz/windows/shared/shared.dart';
 import 'package:provider/provider.dart';
-
-import 'package:keyviz/config/config.dart';
-import 'package:keyviz/providers/key_event.dart';
+import '../../providers/key_event.dart';
 
 class ErrorView extends StatelessWidget {
-  const ErrorView({super.key});
+  const ErrorView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Selector<KeyEventProvider, bool>(
-      selector: (_, keyEvent) => keyEvent.hasError,
-      builder: (context, hasError, __) => hasError
-          ? Center(
-              child: Container(
-                width: 360,
-                padding: const EdgeInsets.all(defaultPadding * 2),
-                decoration: BoxDecoration(
-                  color: Colors.red[100],
-                  border: Border.all(color: context.colorScheme.error),
-                  borderRadius: BorderRadius.circular(defaultPadding),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Align(
-                    //   alignment: Alignment.centerRight,
-                    //   child: IconButton(
-                    //     onPressed: windowManager.close,
-                    //     tooltip: "Quit App",
-                    //     icon: SvgIcon.cross(
-                    //       size: defaultPadding * .6,
-                    //       color: context.colorScheme.error,
-                    //     ),
-                    //   ),
-                    // ),
-                    SvgIcon(
-                      size: defaultPadding * 3,
-                      color: context.colorScheme.error,
-                      icon: VuesaxIcons.error,
-                    ),
-                    const ColumnGap(),
-                    Text(
-                      "Cannot register keyboard/mouse listener! "
-                      "Please quit the app from the system tray.",
-                      style: context.textTheme.labelLarge?.copyWith(
-                        color: context.colorScheme.error,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+    final keyEventProvider = Provider.of<KeyEventProvider>(context);
+    
+    // Chỉ hiển thị khi có lỗi
+    if (!keyEventProvider.hasError) {
+      return const SizedBox.shrink();
+    }
+    
+    return Positioned(
+      top: 50,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
               ),
-            )
-          : const SizedBox(),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.white, size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    'Lỗi ứng dụng',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                keyEventProvider.errorMessage ?? 'Đã xảy ra lỗi không xác định',
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      keyEventProvider.clearError();
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Đóng'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

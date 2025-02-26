@@ -20,6 +20,7 @@ class KeyvizApp extends StatelessWidget {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: ThemeMode.system,
+      debugShowCheckedModeBanner: false,
       home: SafeArea(
         child: Builder(
           builder: (context) {
@@ -30,15 +31,19 @@ class KeyvizApp extends StatelessWidget {
                   providers: [
                     ChangeNotifierProvider(create: (_) {
                       try {
-                        return KeyEventProvider();
+                        final provider = KeyEventProvider();
+                        print("KeyEventProvider created successfully");
+                        return provider;
                       } catch (e) {
                         print("Error creating KeyEventProvider: $e");
-                        return KeyEventProvider();
+                        return KeyEventProvider()..setError("Lỗi khởi tạo: $e");
                       }
                     }),
                     ChangeNotifierProvider(create: (_) {
                       try {
-                        return KeyStyleProvider();
+                        final provider = KeyStyleProvider();
+                        print("KeyStyleProvider created successfully");
+                        return provider;
                       } catch (e) {
                         print("Error creating KeyStyleProvider: $e");
                         return KeyStyleProvider();
@@ -47,13 +52,14 @@ class KeyvizApp extends StatelessWidget {
                   ],
                   child: const Material(
                     type: MaterialType.transparency,
+                    color: Colors.transparent,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        ErrorView(),
                         KeyVisualizer(),
-                        SettingsWindow(),
                         MouseVisualizer(),
+                        SettingsWindow(),
+                        ErrorView(),
                       ],
                     ),
                   ),
@@ -66,9 +72,33 @@ class KeyvizApp extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   color: Colors.red.withOpacity(0.8),
-                  child: Text(
-                    'Lỗi khi khởi tạo ứng dụng: $e',
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Lỗi khởi tạo ứng dụng',
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '$e',
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () {
+                          if (Platform.isWindows) {
+                            Process.run('cmd', ['/c', 'start', '', 'keyviz.exe']);
+                          } else if (Platform.isMacOS) {
+                            Process.run('open', ['-a', 'keyviz']);
+                          } else if (Platform.isLinux) {
+                            Process.run('keyviz', []);
+                          }
+                          exit(0);
+                        },
+                        child: const Text('Khởi động lại'),
+                      ),
+                    ],
                   ),
                 ),
               );
