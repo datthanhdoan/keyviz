@@ -10,6 +10,7 @@ on:
       - completed
     branches:
       - main
+      - develop
 
 # Cấp quyền cho GITHUB_TOKEN
 permissions:
@@ -38,7 +39,19 @@ jobs:
             }
             const latestRelease = releases[0];
             core.setOutput('upload_url', latestRelease.upload_url);
+            core.setOutput('is_prerelease', latestRelease.prerelease.toString());
             return latestRelease.upload_url;
+      
+      - name: Set build type
+        id: set_build_type
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_run" -and "${{ steps.get_latest_release.outputs.is_prerelease }}" -eq "true") {
+            echo "IS_PRERELEASE=true" | Out-File -FilePath $env:GITHUB_ENV -Append
+            echo "MSIX_SUFFIX=-dev" | Out-File -FilePath $env:GITHUB_ENV -Append
+          } else {
+            echo "IS_PRERELEASE=false" | Out-File -FilePath $env:GITHUB_ENV -Append
+            echo "MSIX_SUFFIX=" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -72,6 +85,17 @@ jobs:
             New-Item -ItemType File -Force -Path $msixPath
             Set-Content -Path $msixPath -Value "MSIX build failed"
           }
+          
+          # Rename MSIX file if it's a pre-release
+          if ("${{ env.IS_PRERELEASE }}" -eq "true") {
+            $newMsixPath = "build/windows/x64/runner/Release/keyviz-dev.msix"
+            Copy-Item -Path $msixPath -Destination $newMsixPath -Force
+            echo "MSIX_PATH=$newMsixPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+            echo "MSIX_NAME=keyviz-windows-dev.msix" | Out-File -FilePath $env:GITHUB_ENV -Append
+          } else {
+            echo "MSIX_PATH=$msixPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+            echo "MSIX_NAME=keyviz-windows.msix" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
       
       - name: Upload MSIX Package
         uses: actions/upload-release-asset@v1
@@ -79,6 +103,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url || steps.get_latest_release.outputs.upload_url }}
-          asset_path: ./build/windows/x64/runner/Release/keyviz.msix
-          asset_name: keyviz-windows.msix
+          asset_path: ${{ env.MSIX_PATH }}
+          asset_name: ${{ env.MSIX_NAME }}
           asset_content_type: application/octet-stream 

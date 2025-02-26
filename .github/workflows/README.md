@@ -2,20 +2,80 @@
 
 Repository này chứa các GitHub Actions workflow để tự động hóa quy trình phát triển và phát hành KeyViz.
 
-## Quy trình tự động hóa
+## Quy trình CI/CD
 
-Quy trình tự động hóa hoạt động như sau:
+Tài liệu này mô tả quy trình CI/CD được sử dụng trong dự án KeyViz.
 
-1. Khi bạn push code vào nhánh `main`, workflow `auto-release.yml` sẽ tự động tạo release mới
-2. Sau khi release được tạo, các workflow khác (`build.yml`, `msix.yml`, `docker.yml`) sẽ tự động chạy để build ứng dụng và đính kèm các file build vào release
+## Các workflow
+
+### Auto Create Release
+File: `auto-release.yml`
+
+Workflow này tự động tạo release khi có push vào nhánh `main` hoặc `develop`:
+
+- **Nhánh `develop`**: Tạo pre-release với tag dựa trên timestamp, không tăng phiên bản trong pubspec.yaml
+- **Nhánh `main`**: Tạo release chính thức, tăng phiên bản patch trong pubspec.yaml
+
+### Build
+File: `build.yml`
+
+Workflow này build ứng dụng cho các nền tảng khác nhau (Windows, Linux, macOS) và đính kèm các file build vào release:
+
+- Được kích hoạt khi có release mới hoặc sau khi workflow "Auto Create Release" hoàn thành
+- Kiểm tra xem release có phải là pre-release hay không để đặt tên file build phù hợp
+- Các file build từ nhánh `develop` sẽ có hậu tố `-dev` để phân biệt
+
+### MSIX Package
+File: `msix.yml`
+
+Workflow này tạo gói cài đặt MSIX cho Windows:
+
+- Được kích hoạt khi có release mới hoặc sau khi workflow "Auto Create Release" hoàn thành
+- Kiểm tra xem release có phải là pre-release hay không để đặt tên file MSIX phù hợp
+- File MSIX từ nhánh `develop` sẽ có hậu tố `-dev` để phân biệt
+
+### Docker
+File: `docker.yml`
+
+Workflow này build và đẩy Docker image lên GitHub Container Registry:
+
+- Được kích hoạt khi có release mới hoặc sau khi workflow "Auto Create Release" hoàn thành
+- Kiểm tra xem release có phải là pre-release hay không để đặt tag Docker phù hợp
+- Docker image từ nhánh `develop` sẽ có hậu tố `-dev` để phân biệt
+
+## Quy trình phát triển
+
+1. Phát triển tính năng mới trên nhánh feature hoặc trực tiếp trên nhánh `develop`
+2. Push code lên nhánh `develop` để tạo pre-release tự động
+3. Kiểm tra pre-release và các bản build
+4. Khi sẵn sàng phát hành, merge nhánh `develop` vào `main`
+5. Push code lên nhánh `main` để tạo release chính thức
 
 ## Xử lý lỗi
 
-Các workflow đã được cấu hình để tiếp tục chạy ngay cả khi có lỗi xảy ra:
+Tất cả các workflow đều được cấu hình để tiếp tục chạy ngay cả khi có lỗi xảy ra:
 
-- Nếu các bài kiểm tra thất bại, workflow vẫn sẽ tiếp tục
-- Nếu quá trình build thất bại, các file placeholder sẽ được tạo để đảm bảo workflow không bị gián đoạn
-- Tất cả các bước quan trọng đều có tùy chọn `continue-on-error: true` để đảm bảo workflow hoàn thành
+- Các bước build có thể thất bại nhưng workflow vẫn tiếp tục
+- Nếu quá trình build thất bại, một file placeholder sẽ được tạo để đảm bảo workflow không bị gián đoạn
+- Tất cả các bước quan trọng đều có `continue-on-error: true` để đảm bảo workflow hoàn thành
+
+### Xử lý các vấn đề thường gặp
+
+1. **Workflow không tạo release**:
+   - Kiểm tra xem có thay đổi nào kể từ tag cuối cùng không
+   - Đảm bảo bạn đang push vào nhánh `main` hoặc `develop`
+
+2. **File build không được đính kèm vào release**:
+   - Kiểm tra log của workflow `build.yml` để xem lỗi
+   - Đảm bảo workflow `auto-release.yml` đã hoàn thành thành công
+
+3. **Pre-release không được tạo từ nhánh `develop`**:
+   - Kiểm tra log của workflow `auto-release.yml`
+   - Đảm bảo bạn đang push vào nhánh `develop`
+
+4. **Phân biệt giữa build từ nhánh `develop` và `main`**:
+   - Các file build từ nhánh `develop` có hậu tố `-dev`
+   - Các file build từ nhánh `main` không có hậu tố đặc biệt
 
 ## Workflows
 

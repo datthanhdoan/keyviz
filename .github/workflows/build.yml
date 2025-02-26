@@ -10,6 +10,7 @@ on:
       - completed
     branches:
       - main
+      - develop
 
 # Cấp quyền cho GITHUB_TOKEN
 permissions:
@@ -38,7 +39,19 @@ jobs:
             }
             const latestRelease = releases[0];
             core.setOutput('upload_url', latestRelease.upload_url);
+            core.setOutput('is_prerelease', latestRelease.prerelease.toString());
             return latestRelease.upload_url;
+      
+      - name: Set build type
+        id: set_build_type
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_run" -and "${{ steps.get_latest_release.outputs.is_prerelease }}" -eq "true") {
+            echo "IS_PRERELEASE=true" | Out-File -FilePath $env:GITHUB_ENV -Append
+            echo "BUILD_LABEL=pre-release" | Out-File -FilePath $env:GITHUB_ENV -Append
+          } else {
+            echo "IS_PRERELEASE=false" | Out-File -FilePath $env:GITHUB_ENV -Append
+            echo "BUILD_LABEL=release" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -85,10 +98,21 @@ jobs:
           Set-Content -Path "build/windows/x64/runner/Release/config.json" -Value $configContent
           
           # 4. Tạo file debug.bat để chạy ứng dụng với log
-          Set-Content -Path "build/windows/x64/runner/Release/debug.bat" -Value "@echo off`necho Starting KeyViz with debug logging...`nstart /b keyviz.exe > debug.log 2>&1`necho Log file created at debug.log"
+          Set-Content -Path "build/windows/x64/runner/Release/debug.bat" -Value "@echo off`necho Starting KeyViz with debug logging...`necho Checking permissions...`necho This application requires access to keyboard and mouse input.`necho If it doesn't work, try running as administrator.`necho.`nstart /b keyviz.exe > debug.log 2>&1`necho Log file created at debug.log"
           
-          # 5. Tạo file README với hướng dẫn debug
-          Set-Content -Path "build/windows/x64/runner/Release/DEBUG.txt" -Value "Nếu ứng dụng không chạy được, vui lòng:`n`n1. Chạy file debug.bat để tạo file log`n2. Kiểm tra file debug.log để xem lỗi`n3. Gửi file debug.log cho nhà phát triển để được hỗ trợ"
+          # 5. Tạo file README với hướng dẫn
+          $readmeContent = "KeyViz - Ứng dụng hiển thị phím tắt`n`n"
+          $readmeContent += "Phiên bản: ${{ env.BUILD_LABEL }}`n`n"
+          $readmeContent += "Nếu ứng dụng không chạy được, vui lòng:`n"
+          $readmeContent += "1. Cài đặt Microsoft Visual C++ Redistributable: https://aka.ms/vs/17/release/vc_redist.x64.exe`n"
+          $readmeContent += "2. Đảm bảo đã cài đặt .NET Framework 4.8 hoặc cao hơn`n"
+          $readmeContent += "3. Khởi động lại máy tính sau khi cài đặt`n"
+          $readmeContent += "4. Chạy ứng dụng với quyền Administrator (chuột phải > Run as administrator)`n"
+          $readmeContent += "5. Nếu ứng dụng hiện lên rồi biến mất ngay lập tức, hãy chạy file debug.bat để xem log lỗi`n"
+          $readmeContent += "Lưu ý: Ứng dụng cần quyền truy cập vào bàn phím và chuột để hoạt động.`n"
+          $readmeContent += "Một số phần mềm bảo mật có thể chặn quyền này, hãy kiểm tra cài đặt bảo mật của bạn.`n`n"
+          $readmeContent += "Liên hệ hỗ trợ: [Thông tin liên hệ của bạn]"
+          Set-Content -Path "build/windows/x64/runner/Release/README.txt" -Value $readmeContent
           
           # 6. Kiểm tra và sửa các plugin
           $pluginsDir = "build/windows/x64/runner/Release/data/flutter_assets/packages"
@@ -235,21 +259,39 @@ jobs:
             
             # Tạo file README với hướng dẫn
             $readmeContent = "KeyViz - Ứng dụng hiển thị phím tắt`n`n"
+            $readmeContent += "Phiên bản: ${{ env.BUILD_LABEL }}`n`n"
             $readmeContent += "Nếu ứng dụng không chạy được, vui lòng:`n"
             $readmeContent += "1. Cài đặt Microsoft Visual C++ Redistributable: https://aka.ms/vs/17/release/vc_redist.x64.exe`n"
             $readmeContent += "2. Đảm bảo đã cài đặt .NET Framework 4.8 hoặc cao hơn`n"
-            $readmeContent += "3. Khởi động lại máy tính sau khi cài đặt`n`n"
+            $readmeContent += "3. Khởi động lại máy tính sau khi cài đặt`n"
+            $readmeContent += "4. Chạy ứng dụng với quyền Administrator (chuột phải > Run as administrator)`n"
+            $readmeContent += "5. Nếu ứng dụng hiện lên rồi biến mất ngay lập tức, hãy chạy file debug.bat để xem log lỗi`n"
+            $readmeContent += "Lưu ý: Ứng dụng cần quyền truy cập vào bàn phím và chuột để hoạt động.`n"
+            $readmeContent += "Một số phần mềm bảo mật có thể chặn quyền này, hãy kiểm tra cài đặt bảo mật của bạn.`n`n"
             $readmeContent += "Liên hệ hỗ trợ: [Thông tin liên hệ của bạn]"
             Set-Content -Path "build/windows/x64/runner/Release/README.txt" -Value $readmeContent
             
-            # Tạo file ZIP
-            Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath keyviz-windows.zip -Force
+            # Tạo file ZIP với tên phù hợp
+            if ("${{ env.IS_PRERELEASE }}" -eq "true") {
+              $zipName = "keyviz-windows-dev.zip"
+            } else {
+              $zipName = "keyviz-windows.zip"
+            }
+            Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath $zipName -Force
+            echo "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append
           } else {
             Write-Host "Build directory not found, creating empty zip"
             New-Item -ItemType Directory -Force -Path build/windows/x64/runner/Release
             New-Item -ItemType File -Force -Path build/windows/x64/runner/Release/placeholder.txt
             Set-Content -Path build/windows/x64/runner/Release/placeholder.txt -Value "Build failed"
-            Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath keyviz-windows.zip
+            
+            if ("${{ env.IS_PRERELEASE }}" -eq "true") {
+              $zipName = "keyviz-windows-dev.zip"
+            } else {
+              $zipName = "keyviz-windows.zip"
+            }
+            Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath $zipName
+            echo "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append
           }
       
       - name: Upload Windows Artifact
@@ -258,8 +300,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url || steps.get_latest_release.outputs.upload_url }}
-          asset_path: ./keyviz-windows.zip
-          asset_name: keyviz-windows.zip
+          asset_path: ./${{ env.ZIP_NAME }}
+          asset_name: ${{ env.ZIP_NAME }}
           asset_content_type: application/zip
 
   build-macos:

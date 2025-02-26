@@ -296,27 +296,86 @@ class KeyEventProvider extends ChangeNotifier with TrayListener {
   }
 
   _init() async {
-    // load data
-    await _updateFromJson();
-    // register mouse event listener
-    _registerMouseListener();
-    // register keyboard event listener
-    _registerKeyboardListener();
-    // setup tray manager
-    trayManager.addListener(this);
-    await _setTrayIcon();
-    await _setTrayContextMenu();
+    try {
+      // Kiểm tra quyền truy cập
+      bool hasAccess = await _checkSystemAccess();
+      if (!hasAccess) {
+        print("Không có quyền truy cập vào bàn phím/chuột");
+        _hasError = true;
+        notifyListeners();
+        return;
+      }
+      
+      // load data
+      await _updateFromJson();
+      
+      // register mouse event listener
+      _registerMouseListener();
+      
+      // register keyboard event listener
+      _registerKeyboardListener();
+      
+      // setup tray manager
+      try {
+        trayManager.addListener(this);
+        await _setTrayIcon();
+        await _setTrayContextMenu();
+        print("Tray manager initialized successfully");
+      } catch (e) {
+        print("Error setting up tray manager: $e");
+        // Không đặt _hasError = true vì tray không quan trọng bằng listener
+      }
+    } catch (e, stackTrace) {
+      print("Error in _init: $e");
+      print("Stack trace: $stackTrace");
+      _hasError = true;
+      notifyListeners();
+    }
+  }
+
+  // Kiểm tra quyền truy cập vào hệ thống
+  Future<bool> _checkSystemAccess() async {
+    try {
+      // Kiểm tra backend có sẵn không
+      if (getListenerBackend() == null) {
+        print("Không tìm thấy backend cho nền tảng này");
+        return false;
+      }
+      
+      // Thử đăng ký listener tạm thời để kiểm tra quyền truy cập
+      int? testId = getListenerBackend()!.addKeyboardListener((event) {
+        // Không làm gì, chỉ kiểm tra quyền truy cập
+      });
+      
+      if (testId == null) {
+        print("Không thể đăng ký listener tạm thời, có thể thiếu quyền truy cập");
+        return false;
+      }
+      
+      // Hủy listener tạm thời
+      getListenerBackend()!.removeKeyboardListener(testId);
+      return true;
+    } catch (e) {
+      print("Lỗi khi kiểm tra quyền truy cập: $e");
+      return false;
+    }
   }
 
   _registerMouseListener() async {
-    _mouseListenerId = getListenerBackend()!.addMouseListener(_onMouseEvent);
+    try {
+      _mouseListenerId = getListenerBackend()!.addMouseListener(_onMouseEvent);
 
-    if (_mouseListenerId == null) {
+      if (_mouseListenerId == null) {
+        _hasError = true;
+        notifyListeners();
+        print("Không thể đăng ký mouse listener");
+      } else {
+        print("Đã đăng ký mouse listener thành công");
+      }
+    } catch (e) {
+      print("Lỗi khi đăng ký mouse listener: $e");
       _hasError = true;
       notifyListeners();
-      debugPrint("couldn't register mouse listener");
-    } else {
-      debugPrint("registered mouse listener");
     }
   }
 
@@ -515,15 +574,20 @@ class KeyEventProvider extends ChangeNotifier with TrayListener {
   }
 
   _registerKeyboardListener() async {
-    _keyboardListenerId =
-        getListenerBackend()!.addKeyboardListener(_onRawKeyEvent);
+    try {
+      _keyboardListenerId = getListenerBackend()!.addKeyboardListener(_onRawKeyEvent);
 
-    if (_keyboardListenerId == null) {
+      if (_keyboardListenerId == null) {
+        _hasError = true;
+        notifyListeners();
+        print("Không thể đăng ký keyboard listener!");
+      } else {
+        print("Đã đăng ký keyboard listener thành công");
+      }
+    } catch (e) {
+      print("Lỗi khi đăng ký keyboard listener: $e");
       _hasError = true;
       notifyListeners();
-      debugPrint("cannot register keyboard listener!");
-    } else {
-      debugPrint("keyboard listener registered");
     }
   }
 

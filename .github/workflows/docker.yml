@@ -10,6 +10,7 @@ on:
       - completed
     branches:
       - main
+      - develop
 
 # Cấp quyền cho GITHUB_TOKEN
 permissions:
@@ -20,7 +21,8 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
       
       - name: Get latest release
         if: github.event_name == 'workflow_run'
@@ -38,9 +40,19 @@ jobs:
               return;
             }
             const latestRelease = releases[0];
-            const tagName = latestRelease.tag_name;
-            core.setOutput('tag_name', tagName);
-            return tagName;
+            core.setOutput('is_prerelease', latestRelease.prerelease.toString());
+            return latestRelease.tag_name;
+      
+      - name: Set build type
+        id: set_build_type
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" && "${{ steps.get_latest_release.outputs.is_prerelease }}" == "true" ]]; then
+            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
+            echo "DOCKER_TAG_SUFFIX=-dev" >> $GITHUB_ENV
+          else
+            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
+            echo "DOCKER_TAG_SUFFIX=" >> $GITHUB_ENV
+          fi
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -60,8 +72,12 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=${{ github.event_name == 'release' && github.event.release.tag_name || steps.get_latest_release.outputs.tag_name || 'latest' }}
-            latest
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha
         continue-on-error: true
       
       - name: Build and push Docker image
@@ -69,6 +85,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags || 'ghcr.io/${{ github.repository }}:latest' }}
+          tags: ${{ steps.meta.outputs.tags || format('ghcr.io/{0}:latest{1}', github.repository, env.DOCKER_TAG_SUFFIX) }}
           labels: ${{ steps.meta.outputs.labels }}
         continue-on-error: true 

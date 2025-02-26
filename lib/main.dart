@@ -76,50 +76,67 @@ void main() async {
 
 Future<void> _initWindow() async {
   try {
+    // Đảm bảo ứng dụng hiển thị trước khi áp dụng hiệu ứng
+    await Future.delayed(Duration(seconds: 1));
+    print("Waiting for window to be ready...");
+    
+    // Thiết lập cửa sổ cơ bản trước
     await windowManager.waitUntilReadyToShow(
       WindowOptions(
-        skipTaskbar: true,
+        skipTaskbar: false, // Tạm thời hiển thị trên taskbar
         alwaysOnTop: true,
         fullScreen: !Platform.isMacOS,
         titleBarStyle: TitleBarStyle.hidden,
       ),
       () async {
         try {
-          await windowManager.setIgnoreMouseEvents(true);
+          // Chưa ẩn cửa sổ ngay
           await windowManager.setHasShadow(false);
           await windowManager.setAsFrameless();
-          print("Window options applied successfully");
+          print("Basic window options applied successfully");
         } catch (e) {
-          print("Error applying window options: $e");
+          print("Error applying basic window options: $e");
         }
       },
     );
 
-    if (Platform.isMacOS) {
-      try {
-        WindowManipulator.makeWindowFullyTransparent();
-        await WindowManipulator.zoomWindow();
-        print("macOS specific window setup completed");
-      } catch (e) {
-        print("Error in macOS window setup: $e");
-      }
-    } else {
-      try {
-        Window.setEffect(
-          effect: WindowEffect.transparent,
-          color: Colors.transparent,
-        );
-        print("Non-macOS window effect applied");
-      } catch (e) {
-        print("Error applying window effect: $e");
-      }
-    }
+    // Đảm bảo ứng dụng đã hiển thị trước khi áp dụng hiệu ứng trong suốt
+    await Future.delayed(Duration(seconds: 2));
+    print("Applying transparency effects...");
     
     try {
+      // Áp dụng hiệu ứng trong suốt
+      if (Platform.isMacOS) {
+        try {
+          WindowManipulator.makeWindowFullyTransparent();
+          await WindowManipulator.zoomWindow();
+          print("macOS specific window setup completed");
+        } catch (e) {
+          print("Error in macOS window setup: $e");
+        }
+      } else {
+        try {
+          Window.setEffect(
+            effect: WindowEffect.transparent,
+            color: Colors.transparent,
+          );
+          print("Non-macOS window effect applied");
+        } catch (e) {
+          print("Error applying window effect: $e");
+        }
+      }
+      
+      // Đảm bảo ứng dụng đã hiển thị trước khi ẩn khỏi tương tác
+      await Future.delayed(Duration(seconds: 1));
+      print("Finalizing window setup...");
+      
+      // Áp dụng các thiết lập cuối cùng
+      await windowManager.setIgnoreMouseEvents(true);
+      await windowManager.setSkipTaskbar(true);
       await windowManager.blur();
-      print("Window blur applied");
+      print("Window blur and ignore mouse events applied");
     } catch (e) {
-      print("Error applying window blur: $e");
+      print("Error applying final window effects: $e");
     }
   } catch (e) {
     print("Error in _initWindow: $e");

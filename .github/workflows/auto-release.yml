@@ -2,11 +2,20 @@ name: Auto Create Release
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths-ignore:
       - '**.md'
       - '.gitignore'
   workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Create as pre-release'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 jobs:
   create-release:
@@ -19,6 +28,23 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set release type
+        id: set_release_type
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
+            echo "RELEASE_PREFIX=dev-" >> $GITHUB_ENV
+            echo "BUMP_VERSION=false" >> $GITHUB_ENV
+          elif [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
+            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
+            echo "RELEASE_PREFIX=" >> $GITHUB_ENV
+            echo "BUMP_VERSION=true" >> $GITHUB_ENV
+          else
+            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
+            echo "RELEASE_PREFIX=" >> $GITHUB_ENV
+            echo "BUMP_VERSION=true" >> $GITHUB_ENV
+          fi
       
       - name: Get latest tag
         id: get_latest_tag
@@ -33,11 +59,20 @@ jobs:
           MINOR=$(echo $VERSION | cut -d. -f2)
           PATCH=$(echo $VERSION | cut -d. -f3)
           
-          # Tăng số patch version
-          PATCH=$((PATCH + 1))
+          # Tăng số patch version nếu cần
+          if [[ "${{ env.BUMP_VERSION }}" == "true" ]]; then
+            PATCH=$((PATCH + 1))
+          fi
           
           # Tạo tag mới
-          NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+          if [[ "${{ env.IS_PRERELEASE }}" == "true" && "${{ env.BUMP_VERSION }}" == "false" ]]; then
+            # Đối với nhánh develop, sử dụng timestamp thay vì tăng phiên bản
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            NEW_TAG="${{ env.RELEASE_PREFIX }}$MAJOR.$MINOR.$PATCH-$TIMESTAMP"
+          else
+            NEW_TAG="${{ env.RELEASE_PREFIX }}v$MAJOR.$MINOR.$PATCH"
+          fi
+          
           echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
           echo "NEW_VERSION=$MAJOR.$MINOR.$PATCH" >> $GITHUB_ENV
           echo "::set-output name=new_tag::$NEW_TAG"
@@ -63,19 +98,27 @@ jobs:
           fi
       
       - name: Update version in pubspec.yaml
-        if: env.SKIP_RELEASE == 'false'
+        if: env.SKIP_RELEASE == 'false' && env.BUMP_VERSION == 'true'
         run: |
           # Cập nhật phiên bản trong pubspec.yaml
           sed -i "s/^version: .*/version: ${{ env.NEW_VERSION }}/" pubspec.yaml
       
       - name: Commit version update
-        if: env.SKIP_RELEASE == 'false'
+        if: env.SKIP_RELEASE == 'false' && env.BUMP_VERSION == 'true'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add pubspec.yaml
           git commit -m "Bump version to ${{ env.NEW_TAG }}"
           git push
+          git tag ${{ env.NEW_TAG }}
+          git push --tags
+      
+      - name: Create tag for develop
+        if: env.SKIP_RELEASE == 'false' && env.BUMP_VERSION == 'false'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
           git tag ${{ env.NEW_TAG }}
           git push --tags
       
@@ -87,13 +130,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ env.NEW_TAG }}
-          release_name: Release ${{ env.NEW_TAG }}
+          release_name: ${{ env.IS_PRERELEASE == 'true' && 'Pre-release' || 'Release' }} ${{ env.NEW_TAG }}
           body: |
-            Automatic release created by GitHub Actions.
+            ${{ env.IS_PRERELEASE == 'true' && 'Pre-release build from develop branch.' || 'Automatic release created by GitHub Actions.' }}
             
             Changes in this release:
             ```
             ${{ env.CHANGES }}
             ```
           draft: false
-          prerelease: false 
+          prerelease: ${{ env.IS_PRERELEASE }} 
