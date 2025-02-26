@@ -50,8 +50,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       
+      - name: Build Windows
+        run: flutter build windows --release
+        continue-on-error: true
+      
       - name: Build MSIX Package
-        run: flutter pub run msix:create
+        run: |
+          # Đảm bảo đã cài đặt msix package
+          flutter pub add msix --dev
+          
+          # Build MSIX sử dụng cấu hình từ pubspec.yaml
+          flutter pub run msix:create
         continue-on-error: true
       
       - name: Check MSIX file and create placeholder if needed

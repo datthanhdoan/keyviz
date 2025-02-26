@@ -39,6 +39,19 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   msix: ^3.16.7
 
+# Cấu hình MSIX
+msix_config:
+  display_name: KeyViz
+  publisher_display_name: KeyViz
+  identity_name: KeyVizApp
+  publisher: CN=KeyViz
+  msix_version: 1.0.0.0
+  logo_path: assets/icons/app_icon.png
+  capabilities: internetClient
+  execution_alias: keyviz
+  sign_msix: false
+  install_certificate: false
+
 flutter:
 
   uses-material-design: true

@@ -51,13 +51,116 @@ jobs:
         run: flutter pub get
       
       - name: Build Windows
-        run: flutter build windows --release
+        run: flutter build windows --release --verbose
         continue-on-error: true
+      
+      - name: Fix Windows Build Issues
+        run: |
+          # Kiểm tra và sửa các vấn đề phổ biến
+          
+          # 1. Kiểm tra file flutter_windows.dll
+          $flutterDll = "build/windows/x64/runner/Release/flutter_windows.dll"
+          if (-Not (Test-Path $flutterDll)) {
+            Write-Host "flutter_windows.dll not found, copying from cache"
+            $cachePath = "$env:FLUTTER_ROOT/bin/cache/artifacts/engine/windows-x64/flutter_windows.dll"
+            if (Test-Path $cachePath) {
+              Copy-Item $cachePath -Destination "build/windows/x64/runner/Release/" -Force
+            }
+          }
+          
+          # 2. Kiểm tra các thư mục data
+          $dataFolder = "build/windows/x64/runner/Release/data"
+          if (-Not (Test-Path $dataFolder)) {
+            Write-Host "Data folder not found, creating it"
+            New-Item -ItemType Directory -Force -Path $dataFolder
+            
+            # Copy assets
+            if (Test-Path "assets") {
+              Copy-Item -Path "assets" -Destination $dataFolder -Recurse -Force
+            }
+          }
+          
+          # 3. Tạo file cấu hình
+          $configContent = '{"app_name":"KeyViz","version":"0.0.2","debug_mode":false}'
+          Set-Content -Path "build/windows/x64/runner/Release/config.json" -Value $configContent
+      
+      - name: Debug Windows Build
+        run: |
+          Write-Host "Checking Windows build output..."
+          
+          # Kiểm tra thư mục build
+          if (Test-Path "build/windows/x64/runner/Release") {
+            Write-Host "Build directory exists"
+            Get-ChildItem "build/windows/x64/runner/Release" -Recurse | ForEach-Object {
+              Write-Host $_.FullName
+            }
+          } else {
+            Write-Host "Build directory does not exist"
+          }
+          
+          # Kiểm tra file DLL
+          $missingDlls = @()
+          $requiredDlls = @(
+            "flutter_windows.dll",
+            "vcruntime140.dll",
+            "vcruntime140_1.dll",
+            "msvcp140.dll"
+          )
+          
+          foreach ($dll in $requiredDlls) {
+            if (-Not (Test-Path "build/windows/x64/runner/Release/$dll")) {
+              $missingDlls += $dll
+            }
+          }
+          
+          if ($missingDlls.Count -gt 0) {
+            Write-Host "Missing DLLs: $missingDlls"
+            
+            # Thêm các DLL thiếu từ thư viện hệ thống
+            foreach ($dll in $missingDlls) {
+              if ($dll -like "vcruntime*" -or $dll -like "msvcp*") {
+                Write-Host "Copying system DLL: $dll"
+                try {
+                  Copy-Item "C:/Windows/System32/$dll" -Destination "build/windows/x64/runner/Release/" -ErrorAction SilentlyContinue
+                } catch {
+                  Write-Host "Failed to copy $dll"
+                }
+              }
+            }
+          } else {
+            Write-Host "All required DLLs are present"
+          }
       
       - name: Create Windows ZIP
         run: |
           if (Test-Path "build/windows/x64/runner/Release") {
-            Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath keyviz-windows.zip
+            # Đảm bảo có đủ các DLL cần thiết
+            $vcRedistPath = "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Redist/MSVC/14.29.30133/x64/Microsoft.VC142.CRT"
+            if (Test-Path $vcRedistPath) {
+              Write-Host "Copying VC++ Redistributable DLLs"
+              Copy-Item "$vcRedistPath/*.dll" -Destination "build/windows/x64/runner/Release/" -Force
+            } else {
+              Write-Host "VC++ Redistributable path not found, trying alternative"
+              $altPath = "C:/Windows/System32"
+              $requiredDlls = @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")
+              foreach ($dll in $requiredDlls) {
+                if (Test-Path "$altPath/$dll") {
+                  Copy-Item "$altPath/$dll" -Destination "build/windows/x64/runner/Release/" -Force
+                }
+              }
+            }
+            
+            # Tạo file README với hướng dẫn
+            $readmeContent = "KeyViz - Ứng dụng hiển thị phím tắt`n`n"
+            $readmeContent += "Nếu ứng dụng không chạy được, vui lòng:`n"
+            $readmeContent += "1. Cài đặt Microsoft Visual C++ Redistributable: https://aka.ms/vs/17/release/vc_redist.x64.exe`n"
+            $readmeContent += "2. Đảm bảo đã cài đặt .NET Framework 4.8 hoặc cao hơn`n"
+            $readmeContent += "3. Khởi động lại máy tính sau khi cài đặt`n`n"
+            $readmeContent += "Liên hệ hỗ trợ: [Thông tin liên hệ của bạn]"
+            Set-Content -Path "build/windows/x64/runner/Release/README.txt" -Value $readmeContent
+            
+            # Tạo file ZIP
+            Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath keyviz-windows.zip -Force
           } else {
             Write-Host "Build directory not found, creating empty zip"
             New-Item -ItemType Directory -Force -Path build/windows/x64/runner/Release
