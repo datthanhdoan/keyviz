@@ -4,6 +4,12 @@ on:
   release:
     types: [ created, published ]
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Auto Create Release"]
+    types:
+      - completed
+    branches:
+      - main
 
 # Cấp quyền cho GITHUB_TOKEN
 permissions:
@@ -14,6 +20,25 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
+      
+      - name: Get latest release
+        if: github.event_name == 'workflow_run'
+        id: get_latest_release
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 1
+            });
+            if (releases.length === 0) {
+              core.setFailed('No releases found');
+              return;
+            }
+            const latestRelease = releases[0];
+            core.setOutput('upload_url', latestRelease.upload_url);
+            return latestRelease.upload_url;
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -46,7 +71,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url }}
+          upload_url: ${{ github.event.release.upload_url || steps.get_latest_release.outputs.upload_url }}
           asset_path: ./keyviz-windows.zip
           asset_name: keyviz-windows.zip
           asset_content_type: application/zip

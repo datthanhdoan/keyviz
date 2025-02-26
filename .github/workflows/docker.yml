@@ -4,6 +4,12 @@ on:
   release:
     types: [ created, published ]
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Auto Create Release"]
+    types:
+      - completed
+    branches:
+      - main
 
 # Cấp quyền cho GITHUB_TOKEN
 permissions:
