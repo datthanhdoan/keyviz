@@ -333,15 +333,24 @@ jobs:
             echo "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append
           }
       
+      - name: Set tag name for release
+        id: set_tag_name
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "TAG_NAME=latest-dev" >> $GITHUB_ENV
+          else
+            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+      
       - name: Upload Windows Artifact
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
+        if: needs.get-release-info.outputs.release_id != ''
+        with:
+          files: ./${{ env.ZIP_NAME }}
+          tag_name: ${{ env.TAG_NAME }}
+          prerelease: ${{ needs.get-release-info.outputs.is_prerelease == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.get-release-info.outputs.upload_url }}
-          asset_path: ./${{ env.ZIP_NAME }}
-          asset_name: ${{ env.ZIP_NAME }}
-          asset_content_type: application/zip
       
       - name: Upload Windows Artifact as Artifact
         if: github.event_name == 'push'
@@ -391,14 +400,14 @@ jobs:
           fi
       
       - name: Upload macOS Artifact
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
+        if: needs.get-release-info.outputs.release_id != ''
+        with:
+          files: ./keyviz-macos.dmg
+          tag_name: ${{ env.TAG_NAME }}
+          prerelease: ${{ needs.get-release-info.outputs.is_prerelease == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.get-release-info.outputs.upload_url }}
-          asset_path: ./keyviz-macos.dmg
-          asset_name: keyviz-macos.dmg
-          asset_content_type: application/octet-stream
       
       - name: Upload macOS Artifact as Artifact
         if: github.event_name == 'push'
@@ -446,14 +455,14 @@ jobs:
           fi
       
       - name: Upload Linux Artifact
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
+        if: needs.get-release-info.outputs.release_id != ''
+        with:
+          files: ./keyviz-linux.tar.gz
+          tag_name: ${{ env.TAG_NAME }}
+          prerelease: ${{ needs.get-release-info.outputs.is_prerelease == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.get-release-info.outputs.upload_url }}
-          asset_path: ./keyviz-linux.tar.gz
-          asset_name: keyviz-linux.tar.gz
-          asset_content_type: application/gzip
       
       - name: Upload Linux Artifact as Artifact
         if: github.event_name == 'push'

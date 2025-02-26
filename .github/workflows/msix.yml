@@ -136,15 +136,24 @@ jobs:
             echo "MSIX_NAME=keyviz-windows.msix" | Out-File -FilePath $env:GITHUB_ENV -Append
           }
       
+      - name: Set tag name for release
+        id: set_tag_name
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "TAG_NAME=latest-dev" >> $GITHUB_ENV
+          else
+            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+
       - name: Upload MSIX Package
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
+        if: needs.get-release-info.outputs.release_id != ''
+        with:
+          files: ${{ env.MSIX_PATH }}
+          tag_name: ${{ env.TAG_NAME }}
+          prerelease: ${{ needs.get-release-info.outputs.is_prerelease == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.get-release-info.outputs.upload_url }}
-          asset_path: ${{ env.MSIX_PATH }}
-          asset_name: ${{ env.MSIX_NAME }}
-          asset_content_type: application/octet-stream
       
       - name: Upload MSIX Package as Artifact
         if: github.event_name == 'push'

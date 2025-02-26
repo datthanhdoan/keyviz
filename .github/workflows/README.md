@@ -253,4 +253,15 @@ Tất cả các workflow đã được cập nhật để sử dụng `actions/u
 - Tận dụng các cải tiến về hiệu suất và độ tin cậy của phiên bản mới
 - Đảm bảo tương thích với các thay đổi trong GitHub Actions
 
-Xem thêm thông tin tại: https://github.blog/changelog/2024-04-16-deprecation-notice-v3-of-the-artifact-actions/ 
+Xem thêm thông tin tại: https://github.blog/changelog/2024-04-16-deprecation-notice-v3-of-the-artifact-actions/
+
+### Thay đổi từ actions/upload-release-asset sang softprops/action-gh-release
+
+Các workflow đã được cập nhật để sử dụng `softprops/action-gh-release` thay vì `actions/upload-release-asset@v1` để tải lên tệp vào release. Điều này giúp:
+
+- Khắc phục lỗi "Validation Failed" khi tải lên tệp vào release
+- Đơn giản hóa quá trình tải lên với cú pháp dễ sử dụng hơn
+- Tự động xác định release dựa trên tag thay vì cần cung cấp URL tải lên cụ thể
+- Hỗ trợ tải lên nhiều tệp cùng một lúc
+
+Thay đổi này giúp quy trình tải lên tệp vào release đáng tin cậy hơn và ít gặp lỗi hơn. 
