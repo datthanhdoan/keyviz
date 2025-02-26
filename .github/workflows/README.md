@@ -242,3 +242,15 @@ Nếu bạn gặp vấn đề với các workflow, hãy thử các giải pháp 
 
 - Đảm bảo rằng repository có secret `GITHUB_TOKEN` với quyền truy cập đủ để tải lên các tệp vào release và đẩy Docker image
 - `GITHUB_TOKEN` được GitHub tự động cung cấp, bạn không cần tạo hoặc thêm nó thủ công 
+
+## Cập nhật gần đây
+
+### Nâng cấp actions/upload-artifact lên v4
+
+Tất cả các workflow đã được cập nhật để sử dụng `actions/upload-artifact@v4` thay vì phiên bản v3 đã bị loại bỏ. Điều này giúp:
+
+- Tránh lỗi "Error: This request has been automatically failed because it uses a deprecated version of `actions/upload-artifact: v3`"
+- Tận dụng các cải tiến về hiệu suất và độ tin cậy của phiên bản mới
+- Đảm bảo tương thích với các thay đổi trong GitHub Actions
+
+Xem thêm thông tin tại: https://github.blog/changelog/2024-04-16-deprecation-notice-v3-of-the-artifact-actions/ 

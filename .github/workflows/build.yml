@@ -345,7 +345,7 @@ jobs:
       
       - name: Upload Windows Artifact as Artifact
         if: github.event_name == 'push'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ZIP_NAME }}
           path: ./${{ env.ZIP_NAME }}
@@ -402,7 +402,7 @@ jobs:
       
       - name: Upload macOS Artifact as Artifact
         if: github.event_name == 'push'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: keyviz-macos.dmg
           path: ./keyviz-macos.dmg
@@ -457,7 +457,7 @@ jobs:
       
       - name: Upload Linux Artifact as Artifact
         if: github.event_name == 'push'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: keyviz-linux.tar.gz
           path: ./keyviz-linux.tar.gz
