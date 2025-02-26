@@ -278,5 +278,7 @@ Các workflow đã được cập nhật để đảm bảo luôn có tag khi s�
 - Thêm tên và mô tả cho release để dễ nhận biết
 - Tự động tạo tag mới nếu tag chưa tồn tại trong repository
 - Sử dụng cú pháp PowerShell cho Windows và Bash cho Linux/macOS để đảm bảo tương thích
+- Đảm bảo giá trị `prerelease` được thiết lập chính xác dựa trên biến môi trường `IS_PRERELEASE`
+- Thêm các bước tạo tag cho tất cả các nền tảng (Windows, macOS, Linux) để đảm bảo tag luôn tồn tại trước khi tạo release
 
-Cập nhật này giúp khắc phục lỗi "⚠️ GitHub Releases requires a tag" khi sử dụng `softprops/action-gh-release`. 
+Cập nhật này giúp khắc phục lỗi "⚠️ GitHub Releases requires a tag" khi sử dụng `softprops/action-gh-release` và đảm bảo release được đánh dấu là pre-release khi cần thiết. 

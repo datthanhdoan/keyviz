@@ -375,7 +375,7 @@ jobs:
         with:
           files: ./${{ env.ZIP_NAME }}
           tag_name: ${{ env.TAG_NAME }}
-          prerelease: ${{ needs.get-release-info.outputs.is_prerelease == 'true' }}
+          prerelease: ${{ env.IS_PRERELEASE == 'true' }}
           name: "KeyViz Release ${{ env.TAG_NAME }}"
           generate_release_notes: true
         env:
@@ -446,13 +446,56 @@ jobs:
             mv keyviz-macos.dmg ../../../../../
           fi
       
+      - name: Set build type
+        id: set_build_type
+        run: |
+          if [ "${{ needs.get-release-info.outputs.is_prerelease }}" = "true" ]; then
+            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
+          else
+            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
+          fi
+      
+      - name: Set tag name for release
+        id: set_tag_name
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "TAG_NAME=latest-dev" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            echo "TAG_NAME=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+          else
+            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+          
+          # Đảm bảo luôn có tag, nếu không có thì tạo tag mới
+          if [ -z "$TAG_NAME" ]; then
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            echo "TAG_NAME=auto-release-$TIMESTAMP" >> $GITHUB_ENV
+          fi
+      
+      - name: Create tag if not exists
+        if: env.TAG_NAME != ''
+        run: |
+          if [ "${{ github.event_name }}" != "release" ]; then
+            # Kiểm tra xem tag đã tồn tại chưa
+            git fetch --tags
+            if ! git tag | grep -q "${{ env.TAG_NAME }}"; then
+              echo "Creating new tag: ${{ env.TAG_NAME }}"
+              git config --global user.name "GitHub Actions"
+              git config --global user.email "actions@github.com"
+              git tag -a "${{ env.TAG_NAME }}" -m "Auto-generated tag for release"
+              git push origin "${{ env.TAG_NAME }}"
+            else
+              echo "Tag ${{ env.TAG_NAME }} already exists"
+            fi
+          fi
+      
       - name: Upload macOS Artifact
         uses: softprops/action-gh-release@v1
         if: needs.get-release-info.outputs.release_id != ''
         with:
           files: ./keyviz-macos.dmg
           tag_name: ${{ env.TAG_NAME }}
-          prerelease: ${{ needs.get-release-info.outputs.is_prerelease == 'true' }}
+          prerelease: ${{ env.IS_PRERELEASE == 'true' }}
           name: "KeyViz Release ${{ env.TAG_NAME }}"
           generate_release_notes: true
         env:
@@ -503,13 +546,56 @@ jobs:
             tar -czvf ../../../../../keyviz-linux.tar.gz .
           fi
       
+      - name: Set build type
+        id: set_build_type
+        run: |
+          if [ "${{ needs.get-release-info.outputs.is_prerelease }}" = "true" ]; then
+            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
+          else
+            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
+          fi
+      
+      - name: Set tag name for release
+        id: set_tag_name
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "TAG_NAME=latest-dev" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            echo "TAG_NAME=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+          else
+            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+          
+          # Đảm bảo luôn có tag, nếu không có thì tạo tag mới
+          if [ -z "$TAG_NAME" ]; then
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            echo "TAG_NAME=auto-release-$TIMESTAMP" >> $GITHUB_ENV
+          fi
+      
+      - name: Create tag if not exists
+        if: env.TAG_NAME != ''
+        run: |
+          if [ "${{ github.event_name }}" != "release" ]; then
+            # Kiểm tra xem tag đã tồn tại chưa
+            git fetch --tags
+            if ! git tag | grep -q "${{ env.TAG_NAME }}"; then
+              echo "Creating new tag: ${{ env.TAG_NAME }}"
+              git config --global user.name "GitHub Actions"
+              git config --global user.email "actions@github.com"
+              git tag -a "${{ env.TAG_NAME }}" -m "Auto-generated tag for release"
+              git push origin "${{ env.TAG_NAME }}"
+            else
+              echo "Tag ${{ env.TAG_NAME }} already exists"
+            fi
+          fi
+      
       - name: Upload Linux Artifact
         uses: softprops/action-gh-release@v1
         if: needs.get-release-info.outputs.release_id != ''
         with:
           files: ./keyviz-linux.tar.gz
           tag_name: ${{ env.TAG_NAME }}
-          prerelease: ${{ needs.get-release-info.outputs.is_prerelease == 'true' }}
+          prerelease: ${{ env.IS_PRERELEASE == 'true' }}
           name: "KeyViz Release ${{ env.TAG_NAME }}"
           generate_release_notes: true
         env:

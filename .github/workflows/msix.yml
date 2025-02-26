@@ -159,7 +159,7 @@ jobs:
         with:
           files: ${{ env.MSIX_PATH }}
           tag_name: ${{ env.TAG_NAME }}
-          prerelease: ${{ needs.get-release-info.outputs.is_prerelease == 'true' }}
+          prerelease: ${{ env.IS_PRERELEASE == 'true' }}
           name: "KeyViz Release ${{ env.TAG_NAME }}"
           generate_release_notes: true
         env:
