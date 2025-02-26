@@ -78,7 +78,14 @@ extension on MouseEvent {
 /// keyboard event provider and related configurations
 class KeyEventProvider extends ChangeNotifier with TrayListener {
   KeyEventProvider() {
-    _init();
+    try {
+      _init();
+      print("KeyEventProvider initialized successfully");
+    } catch (e, stackTrace) {
+      print("Error initializing KeyEventProvider: $e");
+      print("Stack trace: $stackTrace");
+      _hasError = true;
+    }
   }
 
   // index of current screen in the screens list

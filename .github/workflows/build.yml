@@ -81,8 +81,67 @@ jobs:
           }
           
           # 3. Tạo file cấu hình
-          $configContent = '{"app_name":"KeyViz","version":"0.0.2","debug_mode":false}'
+          $configContent = '{"app_name":"KeyViz","version":"0.0.3","debug_mode":true}'
           Set-Content -Path "build/windows/x64/runner/Release/config.json" -Value $configContent
+          
+          # 4. Tạo file debug.bat để chạy ứng dụng với log
+          $debugBatContent = '@echo off
+echo Starting KeyViz with debug logging...
+start /b keyviz.exe > debug.log 2>&1
+echo Log file created at debug.log'
+          Set-Content -Path "build/windows/x64/runner/Release/debug.bat" -Value $debugBatContent
+          
+          # 5. Tạo file README với hướng dẫn debug
+          $readmeDebugContent = 'Nếu ứng dụng không chạy được, vui lòng:
+
+1. Chạy file debug.bat để tạo file log
+2. Kiểm tra file debug.log để xem lỗi
+3. Gửi file debug.log cho nhà phát triển để được hỗ trợ'
+          Set-Content -Path "build/windows/x64/runner/Release/DEBUG.txt" -Value $readmeDebugContent
+          
+          # 6. Kiểm tra và sửa các plugin
+          $pluginsDir = "build/windows/x64/runner/Release/data/flutter_assets/packages"
+          if (-Not (Test-Path $pluginsDir)) {
+            Write-Host "Plugins directory not found, creating it"
+            New-Item -ItemType Directory -Force -Path $pluginsDir
+          }
+          
+          # 7. Kiểm tra thư mục flutter_assets
+          $flutterAssetsDir = "build/windows/x64/runner/Release/data/flutter_assets"
+          if (-Not (Test-Path $flutterAssetsDir)) {
+            Write-Host "Flutter assets directory not found, creating it"
+            New-Item -ItemType Directory -Force -Path $flutterAssetsDir
+            
+            # Copy flutter assets từ build cache
+            $cacheAssetsDir = "build/flutter_assets"
+            if (Test-Path $cacheAssetsDir) {
+              Copy-Item -Path "$cacheAssetsDir/*" -Destination $flutterAssetsDir -Recurse -Force
+            }
+          }
+          
+          # 8. Kiểm tra các plugin DLL
+          $pluginsList = @(
+            "hid_listener",
+            "window_size",
+            "tray_manager",
+            "url_launcher_windows",
+            "window_manager",
+            "path_provider_windows",
+            "flutter_acrylic"
+          )
+          
+          foreach ($plugin in $pluginsList) {
+            $pluginDllPath = "build/windows/x64/runner/Release/$plugin.dll"
+            $pluginSrcPath = "build/windows/plugins/$plugin/Release/$plugin.dll"
+            
+            if ((-Not (Test-Path $pluginDllPath)) -and (Test-Path $pluginSrcPath)) {
+              Write-Host "Copying plugin DLL: $plugin"
+              Copy-Item $pluginSrcPath -Destination "build/windows/x64/runner/Release/" -Force
+            }
+          }
+          
+          # 9. Tạo file .env nếu cần
+          Set-Content -Path "build/windows/x64/runner/Release/.env" -Value "ENVIRONMENT=production"
       
       - name: Debug Windows Build
         run: |
@@ -129,6 +188,39 @@ jobs:
             }
           } else {
             Write-Host "All required DLLs are present"
+          }
+          
+          # Kiểm tra plugin DLL
+          Write-Host "Checking plugin DLLs..."
+          $pluginDir = "build/windows/x64/runner/Release/data/flutter_assets/packages"
+          if (Test-Path $pluginDir) {
+            Get-ChildItem $pluginDir -Recurse | ForEach-Object {
+              Write-Host $_.FullName
+            }
+          } else {
+            Write-Host "Plugin directory does not exist"
+          }
+          
+          # Kiểm tra cấu trúc thư mục data
+          Write-Host "Checking data directory structure..."
+          $dataDir = "build/windows/x64/runner/Release/data"
+          if (Test-Path $dataDir) {
+            Get-ChildItem $dataDir -Recurse -Directory | ForEach-Object {
+              Write-Host $_.FullName
+            }
+          } else {
+            Write-Host "Data directory does not exist"
+          }
+          
+          # Kiểm tra file thực thi
+          Write-Host "Checking executable..."
+          $exePath = "build/windows/x64/runner/Release/keyviz.exe"
+          if (Test-Path $exePath) {
+            $fileInfo = Get-Item $exePath
+            Write-Host "Executable size: $($fileInfo.Length) bytes"
+            Write-Host "Executable last modified: $($fileInfo.LastWriteTime)"
+          } else {
+            Write-Host "Executable not found"
           }
       
       - name: Create Windows ZIP
