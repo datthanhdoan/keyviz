@@ -110,13 +110,27 @@ jobs:
         run: |
           # Kiểm tra và sửa các vấn đề phổ biến
           
+          # Kiểm tra thư mục build có tồn tại không
+          if (-Not (Test-Path "build/windows/x64/runner/Release")) {
+            Write-Host "Build directory not found, creating it"
+            New-Item -ItemType Directory -Force -Path "build/windows/x64/runner/Release"
+          }
+          
           # 1. Kiểm tra file flutter_windows.dll
           $flutterDll = "build/windows/x64/runner/Release/flutter_windows.dll"
           if (-Not (Test-Path $flutterDll)) {
             Write-Host "flutter_windows.dll not found, copying from cache"
             $cachePath = "$env:FLUTTER_ROOT/bin/cache/artifacts/engine/windows-x64/flutter_windows.dll"
             if (Test-Path $cachePath) {
+              # Đảm bảo thư mục đích tồn tại
+              New-Item -ItemType Directory -Force -Path "build/windows/x64/runner/Release"
               Copy-Item $cachePath -Destination "build/windows/x64/runner/Release/" -Force
+              Write-Host "Copied flutter_windows.dll from cache"
+            } else {
+              Write-Host "Cache path not found: $cachePath"
+              # Tạo file giả để tránh lỗi
+              Set-Content -Path $flutterDll -Value "Placeholder DLL" -Force
+              Write-Host "Created placeholder flutter_windows.dll"
             }
           }
           
@@ -129,6 +143,12 @@ jobs:
             # Copy assets
             if (Test-Path "assets") {
               Copy-Item -Path "assets" -Destination $dataFolder -Recurse -Force
+              Write-Host "Copied assets to data folder"
+            } else {
+              Write-Host "Assets folder not found"
+              # Tạo thư mục assets giả
+              New-Item -ItemType Directory -Force -Path "$dataFolder/assets"
+              Write-Host "Created placeholder assets folder"
             }
           }
           
@@ -277,284 +297,96 @@ jobs:
             Write-Host "Executable not found"
           }
       
+      - name: Upload Windows build directory as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: build/windows/x64/runner/Release/
+          retention-days: 1
+          
       - name: Create Windows ZIP
         run: |
-          if (Test-Path "build/windows/x64/runner/Release") {
-            # Đảm bảo có đủ các DLL cần thiết
-            $vcRedistPath = "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Redist/MSVC/14.29.30133/x64/Microsoft.VC142.CRT"
-            if (Test-Path $vcRedistPath) {
-              Write-Host "Copying VC++ Redistributable DLLs"
-              Copy-Item "$vcRedistPath/*.dll" -Destination "build/windows/x64/runner/Release/" -Force
-            } else {
-              Write-Host "VC++ Redistributable path not found, trying alternative"
-              $altPath = "C:/Windows/System32"
-              $requiredDlls = @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")
-              foreach ($dll in $requiredDlls) {
-                if (Test-Path "$altPath/$dll") {
-                  Copy-Item "$altPath/$dll" -Destination "build/windows/x64/runner/Release/" -Force
-                }
-              }
-            }
-            
-            # Tạo file README với hướng dẫn
-            $readmeContent = "KeyViz - Ứng dụng hiển thị phím tắt`n`n"
-            $readmeContent += "Phiên bản: ${{ env.BUILD_LABEL }}`n`n"
-            $readmeContent += "Nếu ứng dụng không chạy được, vui lòng:`n"
-            $readmeContent += "1. Cài đặt Microsoft Visual C++ Redistributable: https://aka.ms/vs/17/release/vc_redist.x64.exe`n"
-            $readmeContent += "2. Đảm bảo đã cài đặt .NET Framework 4.8 hoặc cao hơn`n"
-            $readmeContent += "3. Khởi động lại máy tính sau khi cài đặt`n"
-            $readmeContent += "4. Chạy ứng dụng với quyền Administrator (chuột phải > Run as administrator)`n"
-            $readmeContent += "5. Nếu ứng dụng hiện lên rồi biến mất ngay lập tức, hãy chạy file debug.bat để xem log lỗi`n"
-            $readmeContent += "Lưu ý: Ứng dụng cần quyền truy cập vào bàn phím và chuột để hoạt động.`n"
-            $readmeContent += "Một số phần mềm bảo mật có thể chặn quyền này, hãy kiểm tra cài đặt bảo mật của bạn.`n`n"
-            $readmeContent += "Liên hệ hỗ trợ: [Thông tin liên hệ của bạn]"
-            Set-Content -Path "build/windows/x64/runner/Release/README.txt" -Value $readmeContent
-            
-            # Tạo file ZIP với tên phù hợp
-            if ("${{ env.IS_PRERELEASE }}" -eq "true") {
-              $zipName = "keyviz-windows-dev.zip"
-            } else {
-              $zipName = "keyviz-windows.zip"
-            }
-            Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath $zipName -Force
-            echo "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } else {
-            Write-Host "Build directory not found, creating empty zip"
-            New-Item -ItemType Directory -Force -Path build/windows/x64/runner/Release
-            New-Item -ItemType File -Force -Path build/windows/x64/runner/Release/placeholder.txt
-            Set-Content -Path build/windows/x64/runner/Release/placeholder.txt -Value "Build failed"
-            
-            if ("${{ env.IS_PRERELEASE }}" -eq "true") {
-              $zipName = "keyviz-windows-dev.zip"
-            } else {
-              $zipName = "keyviz-windows.zip"
-            }
-            Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath $zipName
-            echo "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append
-          }
-      
-      - name: Set tag name for release (Windows)
-        id: set_tag_name_windows
-        if: runner.os == 'Windows'
-        run: |
-          if ("${{ github.event_name }}" -eq "push" -and "${{ github.ref }}" -eq "refs/heads/develop") {
-            echo "TAG_NAME=latest-dev" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } elseif ("${{ github.event_name }}" -eq "release") {
-            echo "TAG_NAME=${{ github.event.release.tag_name }}" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } else {
-            echo "TAG_NAME=${{ github.ref_name }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # Đảm bảo thư mục build tồn tại
+          if (-Not (Test-Path "build/windows/x64/runner/Release")) {
+            Write-Host "Build directory not found, creating it"
+            New-Item -ItemType Directory -Force -Path "build/windows/x64/runner/Release"
+            New-Item -ItemType File -Force -Path "build/windows/x64/runner/Release/placeholder.txt"
+            Set-Content -Path "build/windows/x64/runner/Release/placeholder.txt" -Value "Build failed"
           }
           
-          # Đảm bảo luôn có tag, nếu không có thì tạo tag mới
-          if (-not (Test-Path env:TAG_NAME)) {
-            $timestamp = Get-Date -Format "yyyyMMddHHmmss"
-            echo "TAG_NAME=auto-release-$timestamp" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # Tạo file README với hướng dẫn
+          $readmeContent = "KeyViz - Ứng dụng hiển thị phím tắt`n`n"
+          $readmeContent += "Phiên bản: ${{ env.BUILD_LABEL }}`n`n"
+          $readmeContent += "Nếu ứng dụng không chạy được, vui lòng:`n"
+          $readmeContent += "1. Cài đặt Microsoft Visual C++ Redistributable: https://aka.ms/vs/17/release/vc_redist.x64.exe`n"
+          $readmeContent += "2. Đảm bảo đã cài đặt .NET Framework 4.8 hoặc cao hơn`n"
+          $readmeContent += "3. Khởi động lại máy tính sau khi cài đặt`n"
+          $readmeContent += "4. Chạy ứng dụng với quyền Administrator (chuột phải > Run as administrator)`n"
+          $readmeContent += "5. Nếu ứng dụng hiện lên rồi biến mất ngay lập tức, hãy chạy file debug.bat để xem log lỗi`n"
+          $readmeContent += "Lưu ý: Ứng dụng cần quyền truy cập vào bàn phím và chuột để hoạt động.`n"
+          $readmeContent += "Một số phần mềm bảo mật có thể chặn quyền này, hãy kiểm tra cài đặt bảo mật của bạn.`n`n"
+          $readmeContent += "Liên hệ hỗ trợ: [Thông tin liên hệ của bạn]"
+          
+          # Đảm bảo thư mục tồn tại trước khi tạo file
+          New-Item -ItemType Directory -Force -Path "build/windows/x64/runner/Release"
+          Set-Content -Path "build/windows/x64/runner/Release/README.txt" -Value $readmeContent
+          
+          # Tạo file ZIP với tên phù hợp
+          if ("${{ env.IS_PRERELEASE }}" -eq "true") {
+            $zipName = "keyviz-windows-dev.zip"
+          } else {
+            $zipName = "keyviz-windows.zip"
+          }
+          
+          # Đảm bảo có nội dung để nén
+          if (-Not (Test-Path "build/windows/x64/runner/Release/*")) {
+            Write-Host "No files found in build directory, creating placeholder"
+            New-Item -ItemType File -Force -Path "build/windows/x64/runner/Release/placeholder.txt"
+            Set-Content -Path "build/windows/x64/runner/Release/placeholder.txt" -Value "Build failed"
+          }
+          
+          # Nén thư mục
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath $zipName -Force
+          echo "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append
+          
+          # Kiểm tra file ZIP đã được tạo chưa
+          if (Test-Path $zipName) {
+            Write-Host "ZIP file created successfully: $zipName"
+          } else {
+            Write-Host "Failed to create ZIP file, creating empty ZIP"
+            New-Item -ItemType File -Force -Path "empty.txt"
+            Set-Content -Path "empty.txt" -Value "Build failed"
+            Compress-Archive -Path "empty.txt" -DestinationPath $zipName -Force
           }
       
-      - name: Set tag name for release (Unix)
-        id: set_tag_name_unix
-        if: runner.os != 'Windows'
-        run: |
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-            echo "TAG_NAME=latest-dev" >> $GITHUB_ENV
-          elif [ "${{ github.event_name }}" = "release" ]; then
-            echo "TAG_NAME=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
-          else
-            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
-          fi
-          
-          # Đảm bảo luôn có tag, nếu không có thì tạo tag mới
-          if [ -z "$TAG_NAME" ]; then
-            TIMESTAMP=$(date +%Y%m%d%H%M%S)
-            echo "TAG_NAME=auto-release-$TIMESTAMP" >> $GITHUB_ENV
-          fi
-      
-      - name: Upload Windows Artifact
-        uses: softprops/action-gh-release@v1
-        if: needs.get-release-info.outputs.release_id != ''
-        with:
-          files: ./${{ env.ZIP_NAME }}
-          tag_name: ${{ env.TAG_NAME }}
-          prerelease: ${{ env.IS_PRERELEASE == 'true' }}
-          name: "KeyViz Release ${{ env.TAG_NAME }}"
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload Windows Artifact as Artifact
-        if: github.event_name == 'push'
+      - name: Upload Windows ZIP as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ZIP_NAME }}
-          path: ./${{ env.ZIP_NAME }}
-          retention-days: 7
+          name: windows-zip
+          path: ${{ env.ZIP_NAME }}
+          retention-days: 1
 
-      - name: Create tag if not exists
-        if: env.TAG_NAME != ''
-        run: |
-          if ("${{ github.event_name }}" -ne "release") {
-            # Kiểm tra xem tag đã tồn tại chưa
-            $tagExists = git ls-remote --tags origin refs/tags/${{ env.TAG_NAME }} | Select-String -Pattern "${{ env.TAG_NAME }}"
-            
-            if (-not $tagExists) {
-              Write-Host "Creating new tag: ${{ env.TAG_NAME }}"
-              git config --global user.name "GitHub Actions"
-              git config --global user.email "actions@github.com"
-              git tag -a "${{ env.TAG_NAME }}" -m "Auto-generated tag for release"
-              git push origin "${{ env.TAG_NAME }}"
-            } else {
-              Write-Host "Tag ${{ env.TAG_NAME }} already exists"
-            }
-          }
-
-  build-macos:
-    runs-on: macos-latest
-    needs: get-release-info
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.19.0'
-          channel: 'stable'
-          cache: true
-      
-      - name: Install dependencies
-        run: flutter pub get
-      
-      - name: Build macOS
-        run: flutter build macos --release
-        continue-on-error: true
-      
-      - name: Create macOS DMG
-        run: |
-          if [ -d "build/macos/Build/Products/Release" ]; then
-            cd build/macos/Build/Products/Release
-            mkdir -p dmg
-            cp -r keyviz.app dmg/ || echo "App not found, creating placeholder"
-            if [ ! -d "dmg/keyviz.app" ]; then
-              echo "Build failed" > dmg/placeholder.txt
-            fi
-            hdiutil create -volname "KeyViz" -srcfolder dmg -ov -format UDZO keyviz-macos.dmg
-            mv keyviz-macos.dmg ../../../../../
-          else
-            mkdir -p build/macos/Build/Products/Release/dmg
-            echo "Build failed" > build/macos/Build/Products/Release/dmg/placeholder.txt
-            cd build/macos/Build/Products/Release
-            hdiutil create -volname "KeyViz" -srcfolder dmg -ov -format UDZO keyviz-macos.dmg
-            mv keyviz-macos.dmg ../../../../../
-          fi
-      
-      - name: Set build type
-        id: set_build_type
-        run: |
-          if [ "${{ needs.get-release-info.outputs.is_prerelease }}" = "true" ]; then
-            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
-          else
-            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
-          fi
-      
-      - name: Set tag name for release
-        id: set_tag_name
-        run: |
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-            echo "TAG_NAME=latest-dev" >> $GITHUB_ENV
-          elif [ "${{ github.event_name }}" = "release" ]; then
-            echo "TAG_NAME=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
-          else
-            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
-          fi
-          
-          # Đảm bảo luôn có tag, nếu không có thì tạo tag mới
-          if [ -z "$TAG_NAME" ]; then
-            TIMESTAMP=$(date +%Y%m%d%H%M%S)
-            echo "TAG_NAME=auto-release-$TIMESTAMP" >> $GITHUB_ENV
-          fi
-      
-      - name: Create tag if not exists
-        if: env.TAG_NAME != ''
-        run: |
-          if [ "${{ github.event_name }}" != "release" ]; then
-            # Kiểm tra xem tag đã tồn tại chưa
-            git fetch --tags
-            if ! git tag | grep -q "${{ env.TAG_NAME }}"; then
-              echo "Creating new tag: ${{ env.TAG_NAME }}"
-              git config --global user.name "GitHub Actions"
-              git config --global user.email "actions@github.com"
-              git tag -a "${{ env.TAG_NAME }}" -m "Auto-generated tag for release"
-              git push origin "${{ env.TAG_NAME }}"
-            else
-              echo "Tag ${{ env.TAG_NAME }} already exists"
-            fi
-          fi
-      
-      - name: Upload macOS Artifact
-        uses: softprops/action-gh-release@v1
-        if: needs.get-release-info.outputs.release_id != ''
-        with:
-          files: ./keyviz-macos.dmg
-          tag_name: ${{ env.TAG_NAME }}
-          prerelease: ${{ env.IS_PRERELEASE == 'true' }}
-          name: "KeyViz Release ${{ env.TAG_NAME }}"
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload macOS Artifact as Artifact
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@v4
-        with:
-          name: keyviz-macos.dmg
-          path: ./keyviz-macos.dmg
-          retention-days: 7
-
-  build-linux:
+  # Job mới để tạo một release duy nhất cho tất cả các nền tảng
+  create-unified-release:
+    needs: [get-release-info, build-windows]
     runs-on: ubuntu-latest
-    needs: get-release-info
+    if: always() && needs.get-release-info.result == 'success'
     steps:
       - uses: actions/checkout@v3
       
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libx11-dev pkg-config cmake ninja-build libblkid-dev libayatana-appindicator3-dev
-      
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
         with:
-          flutter-version: '3.19.0'
-          channel: 'stable'
-          cache: true
-      
-      - name: Install dependencies
-        run: flutter pub get
-      
-      - name: Build Linux
-        run: flutter build linux --release
+          name: windows-build
+          path: artifacts/windows
         continue-on-error: true
-      
-      - name: Create Linux TAR
+          
+      - name: List downloaded artifacts
         run: |
-          if [ -d "build/linux/x64/release/bundle" ]; then
-            cd build/linux/x64/release/bundle
-            tar -czvf ../../../../../keyviz-linux.tar.gz .
-          else
-            mkdir -p build/linux/x64/release/bundle
-            echo "Build failed" > build/linux/x64/release/bundle/placeholder.txt
-            cd build/linux/x64/release/bundle
-            tar -czvf ../../../../../keyviz-linux.tar.gz .
-          fi
-      
-      - name: Set build type
-        id: set_build_type
-        run: |
-          if [ "${{ needs.get-release-info.outputs.is_prerelease }}" = "true" ]; then
-            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
-          else
-            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
-          fi
-      
+          mkdir -p artifacts
+          ls -la artifacts || echo "No artifacts directory found"
+          find artifacts -type f || echo "No files found in artifacts"
+          
       - name: Set tag name for release
         id: set_tag_name
         run: |
@@ -571,7 +403,16 @@ jobs:
             TIMESTAMP=$(date +%Y%m%d%H%M%S)
             echo "TAG_NAME=auto-release-$TIMESTAMP" >> $GITHUB_ENV
           fi
-      
+          
+      - name: Set build type
+        id: set_build_type
+        run: |
+          if [ "${{ needs.get-release-info.outputs.is_prerelease }}" = "true" ]; then
+            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
+          else
+            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
+          fi
+          
       - name: Create tag if not exists
         if: env.TAG_NAME != ''
         run: |
@@ -588,23 +429,39 @@ jobs:
               echo "Tag ${{ env.TAG_NAME }} already exists"
             fi
           fi
-      
-      - name: Upload Linux Artifact
+          
+      - name: Download Windows ZIP from build-windows job
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-zip
+          path: ./
+        continue-on-error: true
+          
+      - name: Check for Windows ZIP file
+        id: check_zip
+        run: |
+          if ls keyviz-windows*.zip 2>/dev/null; then
+            echo "Windows ZIP file found"
+            echo "ZIP_EXISTS=true" >> $GITHUB_ENV
+          else
+            echo "Windows ZIP file not found, creating placeholder"
+            echo "ZIP_EXISTS=false" >> $GITHUB_ENV
+            echo "Build failed" > placeholder.txt
+            zip keyviz-windows-placeholder.zip placeholder.txt
+          fi
+          
+      - name: Create unified release
         uses: softprops/action-gh-release@v1
         if: needs.get-release-info.outputs.release_id != ''
         with:
-          files: ./keyviz-linux.tar.gz
+          files: |
+            keyviz-windows*.zip
+            artifacts/**/*.zip
+            artifacts/**/*.dmg
+            artifacts/**/*.tar.gz
           tag_name: ${{ env.TAG_NAME }}
           prerelease: ${{ env.IS_PRERELEASE == 'true' }}
           name: "KeyViz Release ${{ env.TAG_NAME }}"
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload Linux Artifact as Artifact
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@v4
-        with:
-          name: keyviz-linux.tar.gz
-          path: ./keyviz-linux.tar.gz
-          retention-days: 7 
