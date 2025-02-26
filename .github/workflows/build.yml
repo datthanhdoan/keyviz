@@ -24,35 +24,67 @@ permissions:
   contents: write  # Cần thiết để tải lên tệp vào releases
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  get-release-info:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.get_release_info.outputs.upload_url }}
+      is_prerelease: ${{ steps.get_release_info.outputs.is_prerelease }}
+      release_id: ${{ steps.get_release_info.outputs.release_id }}
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Get latest release
-        if: github.event_name == 'workflow_run'
-        id: get_latest_release
+      - name: Get release info
+        id: get_release_info
         uses: actions/github-script@v6
         with:
           script: |
+            // Nếu là sự kiện release, lấy thông tin từ sự kiện
+            if (context.eventName === 'release') {
+              core.setOutput('upload_url', context.payload.release.upload_url);
+              core.setOutput('is_prerelease', context.payload.release.prerelease.toString());
+              core.setOutput('release_id', context.payload.release.id);
+              return;
+            }
+            
+            // Nếu là push hoặc workflow_run, lấy release mới nhất
             const { data: releases } = await github.rest.repos.listReleases({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              per_page: 1
+              per_page: 5
             });
+            
             if (releases.length === 0) {
               core.setFailed('No releases found');
               return;
             }
+            
+            // Nếu là push vào develop, tìm pre-release mới nhất
+            if (context.eventName === 'push' && context.ref === 'refs/heads/develop') {
+              const preRelease = releases.find(release => release.prerelease);
+              if (preRelease) {
+                core.setOutput('upload_url', preRelease.upload_url);
+                core.setOutput('is_prerelease', 'true');
+                core.setOutput('release_id', preRelease.id);
+                console.log(`Found pre-release: ${preRelease.tag_name}`);
+                return;
+              }
+            }
+            
+            // Mặc định lấy release mới nhất
             const latestRelease = releases[0];
             core.setOutput('upload_url', latestRelease.upload_url);
             core.setOutput('is_prerelease', latestRelease.prerelease.toString());
-            return latestRelease.upload_url;
+            core.setOutput('release_id', latestRelease.id);
+            console.log(`Using latest release: ${latestRelease.tag_name}`);
+
+  build-windows:
+    runs-on: windows-latest
+    needs: get-release-info
+    steps:
+      - uses: actions/checkout@v3
       
       - name: Set build type
         id: set_build_type
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_run" -and "${{ steps.get_latest_release.outputs.is_prerelease }}" -eq "true") {
+          if ("${{ needs.get-release-info.outputs.is_prerelease }}" -eq "true") {
             echo "IS_PRERELEASE=true" | Out-File -FilePath $env:GITHUB_ENV -Append
             echo "BUILD_LABEL=pre-release" | Out-File -FilePath $env:GITHUB_ENV -Append
           } else {
@@ -306,34 +338,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url || steps.get_latest_release.outputs.upload_url }}
+          upload_url: ${{ needs.get-release-info.outputs.upload_url }}
           asset_path: ./${{ env.ZIP_NAME }}
           asset_name: ${{ env.ZIP_NAME }}
           asset_content_type: application/zip
+      
+      - name: Upload Windows Artifact as Artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: ./${{ env.ZIP_NAME }}
+          retention-days: 7
 
   build-macos:
     runs-on: macos-latest
+    needs: get-release-info
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Get latest release
-        if: github.event_name == 'workflow_run'
-        id: get_latest_release
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { data: releases } = await github.rest.repos.listReleases({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 1
-            });
-            if (releases.length === 0) {
-              core.setFailed('No releases found');
-              return;
-            }
-            const latestRelease = releases[0];
-            core.setOutput('upload_url', latestRelease.upload_url);
-            return latestRelease.upload_url;
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -373,34 +395,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url || steps.get_latest_release.outputs.upload_url }}
+          upload_url: ${{ needs.get-release-info.outputs.upload_url }}
           asset_path: ./keyviz-macos.dmg
           asset_name: keyviz-macos.dmg
           asset_content_type: application/octet-stream
+      
+      - name: Upload macOS Artifact as Artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v3
+        with:
+          name: keyviz-macos.dmg
+          path: ./keyviz-macos.dmg
+          retention-days: 7
 
   build-linux:
     runs-on: ubuntu-latest
+    needs: get-release-info
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Get latest release
-        if: github.event_name == 'workflow_run'
-        id: get_latest_release
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { data: releases } = await github.rest.repos.listReleases({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 1
-            });
-            if (releases.length === 0) {
-              core.setFailed('No releases found');
-              return;
-            }
-            const latestRelease = releases[0];
-            core.setOutput('upload_url', latestRelease.upload_url);
-            return latestRelease.upload_url;
       
       - name: Install Linux dependencies
         run: |
@@ -438,7 +450,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url || steps.get_latest_release.outputs.upload_url }}
+          upload_url: ${{ needs.get-release-info.outputs.upload_url }}
           asset_path: ./keyviz-linux.tar.gz
           asset_name: keyviz-linux.tar.gz
-          asset_content_type: application/gzip 
+          asset_content_type: application/gzip
+      
+      - name: Upload Linux Artifact as Artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v3
+        with:
+          name: keyviz-linux.tar.gz
+          path: ./keyviz-linux.tar.gz
+          retention-days: 7 

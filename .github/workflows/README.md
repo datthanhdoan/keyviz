@@ -48,7 +48,7 @@ Workflow này build và đẩy Docker image lên GitHub Container Registry:
 
 1. Phát triển tính năng mới trên nhánh feature hoặc trực tiếp trên nhánh `develop`
 2. Push code lên nhánh `develop` để tự động kích hoạt các workflow build, msix và docker
-3. Kiểm tra các bản build
+3. Các file build sẽ được đính kèm vào pre-release mới nhất từ nhánh `develop`
 4. Khi sẵn sàng phát hành, merge nhánh `develop` vào `main`
 5. Push code lên nhánh `main` để tạo release chính thức
 
@@ -73,7 +73,8 @@ Tất cả các workflow đều được cấu hình để tiếp tục chạy n
 
 3. **File build không được đính kèm vào release**:
    - Kiểm tra log của workflow `build.yml` để xem lỗi
-   - Đảm bảo workflow `auto-release.yml` đã hoàn thành thành công nếu đang sử dụng release
+   - Đảm bảo workflow `auto-release.yml` đã hoàn thành thành công và đã tạo pre-release
+   - Kiểm tra xem pre-release có tồn tại không bằng cách xem tab Releases trên GitHub
 
 4. **Pre-release không được tạo từ nhánh `develop`**:
    - Kiểm tra log của workflow `auto-release.yml`
@@ -170,6 +171,8 @@ Workflow này tự động tạo và đẩy Docker image lên GitHub Container R
 ### Tự động build khi phát triển
 
 Mỗi khi bạn push code vào nhánh `develop`, các workflow build, msix và docker sẽ tự động chạy để build ứng dụng. Điều này giúp bạn kiểm tra xem các thay đổi có ảnh hưởng đến quá trình build không.
+
+Các file build sẽ được đính kèm vào pre-release mới nhất từ nhánh `develop`. Điều này giúp bạn không bị mất các file build khi artifacts hết hạn.
 
 ### Tự động tạo Release
 
